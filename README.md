@@ -79,9 +79,11 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
 1. Download `ltw_oem_module-<version>.zip` from the [latest release](../../releases/latest). It includes
    LtwEmu, the LSPosed/Vector part, as a system app.
 2. Install **Link to Windows** from Play (optional now: the Action button opens Play for you later).
-3. Download **Device Integration Service** (the APK, not a bundle) from an APK mirror into
-   `/sdcard/Download/`, keeping its file name, or skip this: the Action button opens the download page
-   later. It is not on Play. Before use, every APK is checked with Android's own signature verifier
+3. Download **Device Integration Service** from APKMirror: the APK variant, not the APKM bundle. Save
+   it directly in `/sdcard/Download/` (not in a subfolder) and keep its file name, which looks like
+   `com.microsoft.deviceintegrationservice_2.25044.5.1.0-6780000_minAPI32(nodpi)_apkmirror.com.apk`.
+   Or skip this: the Action button opens the download page later, and points out a copy saved in the
+   wrong folder or a bundle. It is not on Play. Before use, every APK is checked with Android's own signature verifier
    against Microsoft's certificate (pinned SHA-256), so a fake or tampered file is refused. Also uninstall any other
    `CrossDeviceServiceBroker` / Samsung-port modules: exactly one broker may exist.
 4. Install `ltw_oem_module-<version>.zip` in the KernelSU/Magisk manager. The installer picks up both

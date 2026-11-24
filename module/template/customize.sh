@@ -45,6 +45,11 @@ set_perm "$MODPATH/action.sh" 0 0 0755
 if [ -n "$MISSING" ]; then
     ui_print "! After the reboot, tap this module's Action button to finish the"
     ui_print "  setup:$MISSING (it opens the download pages)."
+    case "$MISSING" in *DeviceIntegrationService*)
+        ui_print "  Device Integration Service: the APK (not the APKM bundle), saved"
+        ui_print "  directly in Download/ with its file name kept, e.g."
+        ui_print "  Download/$LTW_DIS_EXAMPLE"
+    esac
 fi
 ui_print "- LtwEmu (the LSPosed/Vector part) is included as a system app."
 if [ -x /data/adb/lspd/cli ]; then

@@ -21,7 +21,9 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
 - Root module: the Action button reboots by itself (10 s countdown) when a setup step needs it,
   including after Vector enabled LtwEmu; never twice for the same step.
 - Root module: deviceintegrationservice is picked up straight from `/sdcard/Download` (APK-mirror file
-  name); the Action button opens its download page. Every APK is verified with Android's signature
+  name); the Action button opens its download page, says exactly where to save it (directly in
+  Download/, file name kept, with an example) and points out a copy in another folder or an APKM
+  bundle. Every APK is verified with Android's signature
   verifier against Microsoft's pinned certificate before it becomes a system app.
 - Root module: the installer refuses to install without module mounting (built into Magisk/APatch;
   a metamodule on KernelSU), Zygisk and Vector/LSPosed, instead of installing a module that does

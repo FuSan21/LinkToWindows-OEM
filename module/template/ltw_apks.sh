@@ -16,6 +16,8 @@
 
 LTW_SRC=/sdcard/Download/LinkToWindowsOEM
 LTW_DOWNLOADS=/sdcard/Download
+# What an APKMirror download of deviceintegrationservice is called (shown to the user as an example).
+LTW_DIS_EXAMPLE='com.microsoft.deviceintegrationservice_2.25044.5.1.0-6780000_minAPI32(nodpi)_apkmirror.com.apk'
 
 # Microsoft's signing certificates (apksigner verify --print-certs), unchanged since at least 2023.
 ltw_pins() {
@@ -56,6 +58,14 @@ ltw_has_apk() {
 ltw_download() {
     # shellcheck disable=SC2010
     ls -t "$LTW_DOWNLOADS"/*.apk 2>/dev/null | grep -i "$1" | head -1
+}
+
+# Files on /sdcard whose name matches <pattern> but that are not where ltw_download looks: in a
+# subfolder or another folder, or an APKM/XAPK bundle instead of the APK. One path per line.
+ltw_misplaced() {
+    find /sdcard/ -maxdepth 4 -type f 2>/dev/null | grep -v '^/sdcard/Android/' \
+        | grep -iE "$1" | grep -iE '\.(apk|apkm|xapk|apks)$' \
+        | grep -vE "^$LTW_DOWNLOADS/[^/]*\.[aA][pP][kK]\$" | grep -v "^$LTW_SRC/[^/]*\.apk\$"
 }
 
 # ltw_provide <dest dir> <Name> <package> [<previous module's dir>] [<download pattern>]

@@ -57,9 +57,18 @@ setup() {
     return 0
 }
 if ! setup DeviceIntegrationService "$DIS" 'device.*integration.*service'; then
-    todo "Download Device Integration Service (APK file, not the bundle) to Download/;"
-    echo "       its download page is opening now. Then tap Action again: the APK is"
-    echo "       found there and checked for Microsoft's certificate."
+    todo "Download Device Integration Service from APKMirror (its page is opening now)."
+    echo "       - pick the APK variant, not the APKM bundle"
+    echo "       - save it directly in Download/ (not in a subfolder)"
+    echo "       - keep its file name; it looks like:"
+    echo "         Download/$LTW_DIS_EXAMPLE"
+    echo "       Then tap Action again: it is found there and checked for Microsoft's certificate."
+    ltw_misplaced 'device.*integration.*service' | while read -r f; do
+        case "$f" in
+            *.[aA][pP][kK]) echo "[WARN] Found $f: move it directly into Download/." ;;
+            *) echo "[WARN] Found $f: that is a bundle; download the APK variant instead." ;;
+        esac
+    done
     open_url "$DIS_URL"
 fi
 if ! setup LinktoWindows "$LTW"; then
