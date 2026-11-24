@@ -6,26 +6,62 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'   # Mondays 06:00 Asia/Dhaka: do the patches still apply to lineage-24.0?
 
 permissions:
-  contents: write   # create releases on tags
+  contents: read
+
+env:
+  TZ: Asia/Dhaka
 
 jobs:
-  module:
+  lint:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    env:
-      TZ: Asia/Dhaka
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: shellcheck
+        run: |
+          shellcheck -s bash rom/apply-patches.sh module/build-module.sh module/virtual_keyboard/build.sh
+          # Android /system/bin/sh (mksh) scripts; KernelSU/Magisk provide ui_print, abort, set_perm...
+          shellcheck -s sh -e SC2034,SC2154,SC3043 module/template/*.sh
+
+  patches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ltw
+      - name: Apply the patches to LineageOS lineage-24.0 frameworks/base
+        run: |
+          # Only the files the patches touch: partial, shallow, sparse clone (a few MB).
+          FILES=$(sed -n 's|^diff --git a/\([^ ]*\) b/.*|\1|p' ltw/rom/patches/frameworks_base/*.patch | sort -u)
+          git clone -q --filter=blob:none --no-checkout --depth 1 -b lineage-24.0 \
+            https://github.com/LineageOS/android_frameworks_base.git top/frameworks/base
+          git -C top/frameworks/base sparse-checkout set --no-cone $FILES
+          git -C top/frameworks/base checkout -q
+          echo "lineage-24.0 @ $(git -C top/frameworks/base rev-parse --short HEAD)"
+          cd top && bash ../ltw/rom/apply-patches.sh
+
+  module:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create releases on tags
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0   # version = git describe, versionCode = commit count
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
         with:
           packages: 'platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018'
 
@@ -54,7 +90,7 @@ jobs:
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           chmod +x gradlew
-          ./gradlew --no-daemon :device-private:deviceprivateJar :broker:assembleRelease :ltwemu:assembleRelease
+          ./gradlew :device-private:deviceprivateJar :broker:assembleRelease :ltwemu:assembleRelease
 
       - name: Build virtual keyboard (NDK)
         run: bash module/virtual_keyboard/build.sh
@@ -64,17 +100,26 @@ jobs:
           bash module/build-module.sh
           mkdir -p dist
           cp module/build/ltw_oem_module-*.zip dist/
-          cp module/ltwemu/build/outputs/apk/release/*.apk "dist/LtwEmu-$LTW_VERSION.apk"
-          ls -l dist
+          # KernelSU/Magisk in-app updates (module.prop updateJson -> latest release asset).
+          cat > dist/update.json <<EOF
+          {
+            "version": "$LTW_VERSION",
+            "versionCode": $LTW_VERSION_CODE,
+            "zipUrl": "https://github.com/${{ github.repository }}/releases/download/$LTW_VERSION/ltw_oem_module-$LTW_VERSION.zip",
+            "changelog": "https://raw.githubusercontent.com/${{ github.repository }}/main/CHANGELOG.md"
+          }
+          EOF
+          (cd dist && sha256sum ltw_oem_module-*.zip > SHA256SUMS)
+          ls -l dist && cat dist/update.json dist/SHA256SUMS
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ltw-oem-${{ env.LTW_VERSION }}
           path: dist/*
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: dist/*
           generate_release_notes: true

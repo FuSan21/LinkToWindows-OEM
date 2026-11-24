@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Actions are pinned to commit SHAs; Dependabot bumps the SHA and the version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      timezone: Asia/Dhaka
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: monthly
+      timezone: Asia/Dhaka

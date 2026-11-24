@@ -4,9 +4,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-${LOCALAPPDATA:-$HOME}/Android/Sdk}}"
-NDK="${ANDROID_NDK_HOME:-$(ls -d "$SDK"/ndk/* 2>/dev/null | sort -V | tail -1)}"
+NDK="${ANDROID_NDK_HOME:-$(printf '%s
+' "$SDK"/ndk/* | sort -V | tail -1)}"
 [ -d "$NDK" ] || { echo "Android NDK not found; set ANDROID_NDK_HOME" >&2; exit 1; }
-CXX=$(ls "$NDK"/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android31-clang++* | head -1)
+CXX=
+for f in "$NDK"/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android31-clang++*; do CXX=$f; break; done
+[ -e "$CXX" ] || { echo "aarch64 clang++ not found in $NDK" >&2; exit 1; }
 OUT="$ROOT/module/virtual_keyboard/build"
 mkdir -p "$OUT"
 "$CXX" -std=c++17 -O2 -Wall -Wextra -Werror -fPIE -pie -static-libstdc++ -s \
