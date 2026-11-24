@@ -25,7 +25,8 @@ jobs:
         run: |
           shellcheck -s bash rom/apply-patches.sh module/build-module.sh module/virtual_keyboard/build.sh
           # Android /system/bin/sh (mksh) scripts; KernelSU/Magisk provide ui_print, abort, set_perm...
-          shellcheck -s sh -e SC2034,SC2154,SC3043 module/template/*.sh
+          # SC1091: they source ltw_apks.sh by its on-device path.
+          shellcheck -s sh -e SC2034,SC2154,SC3043,SC1091 module/template/*.sh
 
   patches:
     runs-on: ubuntu-latest
