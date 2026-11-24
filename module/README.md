@@ -30,9 +30,10 @@ a few system_server hooks.
 
 | File | When | What |
 |---|---|---|
-| `customize.sh` | install | Copies the Microsoft APKs from `/sdcard/Download/LinkToWindowsOEM/`, else from the installed module (updates) |
+| `ltw_apks.sh` | — | Finds each Microsoft APK: `/sdcard/Download/LinkToWindowsOEM/`, the previous module install, or the copy installed as a normal app (base + split APKs) |
+| `customize.sh` | install | Places the Microsoft APKs it finds; never aborts on a missing one |
 | `service.sh` | every boot | SELinux rule for deviceintegrationservice's `priv_app_<targetSdk>`; enables LtwEmu in Vector once; runs `vendor.virtual_keyboard` |
-| `action.sh` | Action button | Health check |
+| `action.sh` | Action button | Finishes the setup one step per tap (copies a now-available APK, opens Play for Link to Windows, asks for a reboot), then the health check |
 | `system/app/LtwEmu` | — | The LSPosed/Vector module, shipped as a system app |
 | `module.prop` `updateJson` | — | In-app updates from the latest GitHub release |
 

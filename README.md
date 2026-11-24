@@ -41,12 +41,12 @@ Bluetooth transport (`feature_oem_rfcomm`). Instant hotspot is untested.
 
 ## What you need (both paths)
 
-Two **Microsoft-signed** APKs. They are not included here; get them yourself and keep them unmodified.
+Two **Microsoft-signed** apps. They are not included here and are used unmodified.
 
 | File name | Package | Where from | Tested |
 |---|---|---|---|
 | `DeviceIntegrationService.apk` | `com.microsoft.deviceintegrationservice` | Preinstalled on OnePlus/OPPO/realme/Honor phones (`/system_ext/priv-app/DeviceIntegrationService`), or an APK mirror ("Device Integration Service") | 2.24112, 2.25044 |
-| `LinktoWindows.apk` | `com.microsoft.appmanager` | Any **single** (non-split) Microsoft-signed Link to Windows APK **not newer** than the one on Play, e.g. OnePlus' preinstalled `/my_stock/priv-app/LinktoWindows/LinktoWindows.apk` | 1.24112 as system copy, Play 1.26102 on top |
+| `LinktoWindows.apk` | `com.microsoft.appmanager` | **Just install it from Play.** The root module copies the installed version (including split APKs) as the system copy. ROM builds: any Microsoft-signed APK **not newer** than Play's, e.g. OnePlus' `/my_stock/priv-app/LinktoWindows/LinktoWindows.apk` | Play 1.26102, 1.26111 beta |
 
 Why Link to Windows must be a system (privileged) app: on Android 17 a non-privileged MediaProjection owner
 must run a `mediaProjection` foreground service, which Link to Windows doesn't, so mirroring would die. OEMs
@@ -72,17 +72,16 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
 
 1. Download `ltw_oem_module-<version>.zip` from the [latest release](../../releases/latest). It includes
    LtwEmu, the LSPosed/Vector part, as a system app.
-2. On the phone, create `/sdcard/Download/LinkToWindowsOEM/` and copy both Microsoft APKs into it,
-   named exactly `DeviceIntegrationService.apk` and `LinktoWindows.apk`.
-3. Remove conflicting copies:
-   - uninstall any `deviceintegrationservice` you installed as a normal app:
-     `adb shell pm uninstall com.microsoft.deviceintegrationservice`
-     (only if it shows under `/data/app` in `adb shell pm path com.microsoft.deviceintegrationservice`);
-   - uninstall any other `CrossDeviceServiceBroker` / Samsung-port modules. Exactly one broker may exist.
-   - **Keep** Link to Windows from Play installed. It becomes an update of the system copy.
-4. Install `ltw_oem_module-<version>.zip` in the KernelSU/Magisk manager. The installer copies the two APKs
-   from step 2 into the module and aborts with a clear message if one is missing.
-5. **Reboot.**
+2. Install **Link to Windows** from Play (optional now: the Action button opens Play for you later).
+3. Copy `DeviceIntegrationService.apk` to `/sdcard/Download/LinkToWindowsOEM/` (create the folder). If
+   you installed it as a normal app instead, that copy is used. Also uninstall any other
+   `CrossDeviceServiceBroker` / Samsung-port modules: exactly one broker may exist.
+4. Install `ltw_oem_module-<version>.zip` in the KernelSU/Magisk manager. The installer picks up both
+   Microsoft apps (from that folder, or the installed copies). It never stops because one is missing.
+5. **Reboot.** If an app was missing, tap the module's **Action** button: it copies what is now
+   available, or opens Play for Link to Windows / says where to put deviceintegrationservice. Tap it
+   again after each step; it tells you when to reboot. Installed copies stay installed as updates of the
+   system copies.
 6. Enable **LtwEmu** in LSPosed/Vector with scope **System Framework** and
    **com.microsoft.deviceintegrationservice**, then **reboot again**. With Vector (`/data/adb/lspd/cli`
    present) the module does this itself on the first boot; you only reboot again. Manual equivalent:

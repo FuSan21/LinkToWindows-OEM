@@ -14,3 +14,6 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
   `rom/services` and is shared with the root module (`LtwWindowPolicy`).
 - ROM: clear build error when a Microsoft APK is missing.
 - CI: shellcheck, weekly check that the patches apply to `lineage-24.0`, `SHA256SUMS`, pinned actions.
+- Root module: Link to Windows no longer needs a separate APK: the installed Play version (base + split
+  APKs) becomes the system copy. A missing Microsoft app never stops the install; the Action button
+  finishes the setup (opens Play for Link to Windows) one step per tap.

@@ -1,5 +1,6 @@
 #!/system/bin/sh
-# KernelSU / Magisk "Action" button: health check of every piece the integration needs.
+# KernelSU / Magisk "Action" button. First finishes the setup (Microsoft's APKs, see ltw_apks.sh),
+# one step per tap, then checks every piece the integration needs.
 MODDIR=${0%/*}
 DIS=com.microsoft.deviceintegrationservice
 LTW=com.microsoft.appmanager
@@ -7,8 +8,11 @@ BROKER=com.microsoftsdk.crossdeviceservicebroker
 EMU=me.ayra.ltw.emu
 FAIL=0
 
+. "$MODDIR/ltw_apks.sh"
+
 ok()  { echo "[ OK ] $*"; }
 bad() { echo "[FAIL] $*"; FAIL=1; }
+todo() { echo "[TODO] $*"; TODO=1; }
 
 version() {
     dumpsys package "$1" 2>/dev/null | sed -n 's/^ *versionName=//p' | head -1
@@ -17,10 +21,42 @@ version() {
 echo "Link to Windows OEM integration $(sed -n 's/^version=//p' "$MODDIR/module.prop")"
 echo
 
+# ---- setup: Microsoft's APKs ----
+TODO=0
+COPIED=0
+setup() {
+    name=$1 pkg=$2
+    ltw_provide "$MODDIR/system/priv-app/$name" "$name" "$pkg" || return 1
+    if [ -n "$LTW_FROM" ]; then
+        echo "[ NEW] $name: copied from $LTW_FROM"
+        COPIED=1
+    fi
+    return 0
+}
+if ! setup DeviceIntegrationService "$DIS"; then
+    todo "deviceintegrationservice is missing (it is not on Play). Copy"
+    echo "       DeviceIntegrationService.apk to $LTW_SRC/, then tap Action again."
+fi
+if ! setup LinktoWindows "$LTW"; then
+    todo "Install Link to Windows from Play (opening its page now), then tap Action again."
+    am start -a android.intent.action.VIEW -d "market://details?id=$LTW" >/dev/null 2>&1 \
+        || am start -a android.intent.action.VIEW \
+            -d "https://play.google.com/store/apps/details?id=$LTW" >/dev/null 2>&1
+fi
+[ $COPIED = 1 ] && ltw_mark_reboot "$MODDIR"
+if [ $TODO = 1 ]; then
+    exit 0
+fi
+if ltw_reboot_pending "$MODDIR"; then
+    echo
+    echo "Setup done. Reboot now, then tap Action again to check everything."
+    exit 0
+fi
+
 if dumpsys package "$DIS" 2>/dev/null | grep -q "codePath=/system/priv-app/DeviceIntegrationService"; then
     ok "deviceintegrationservice $(version "$DIS") is a priv-app"
 else
-    bad "deviceintegrationservice is not running from /system/priv-app (uninstall the /data/app copy)"
+    bad "deviceintegrationservice has no /system/priv-app copy"
 fi
 if dumpsys package "$LTW" 2>/dev/null | grep -q "codePath=/system/priv-app/LinktoWindows"; then
     ok "Link to Windows $(version "$LTW") is a priv-app (Play updates go on top)"
