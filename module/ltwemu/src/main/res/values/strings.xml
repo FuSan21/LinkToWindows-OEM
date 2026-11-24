@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="xposed_description">Emulates the LineageOS Link to Windows OEM framework patch (cross_device_service, broker platform perms, CrossDeviceManager fetcher) on rooted stock.</string>
+</resources>

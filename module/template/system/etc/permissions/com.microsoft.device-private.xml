@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Emulation: same as vendor/ltw/device-private, but on /system (module overlay). -->
+<permissions>
+    <library name="com.microsoft.device-private"
+             file="/system/framework/com.microsoft.device-private.jar" />
+</permissions>

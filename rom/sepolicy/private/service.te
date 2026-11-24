@@ -1,0 +1,6 @@
+# Link to Windows OEM integration: binder registered by system_server as "cross_device_service".
+# app_api_service => findable by app domains (deviceintegrationservice runs as priv_app);
+# the service itself rejects every caller except deviceintegrationservice (CrossDeviceService.onTransact).
+type cross_device_service, app_api_service, system_server_service, service_manager_type;
+# vendor.virtual_keyboard, findable by deviceintegrationservice (priv_app).
+type ltw_virtual_keyboard_service, app_api_service, service_manager_type;

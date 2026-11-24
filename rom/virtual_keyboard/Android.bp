@@ -1,0 +1,19 @@
+// vendor.virtual_keyboard for Link to Windows (re-implementation of OnePlus
+// /system/bin/virtual_keyboard). Same source as the rooted-stock emulation build.
+cc_binary {
+    name: "ltw_virtual_keyboard",
+    system_ext_specific: true,
+    srcs: ["ltw_virtual_keyboard.cpp"],
+    cflags: [
+        "-DLTW_PLATFORM",
+        "-Wall",
+        "-Werror",
+    ],
+    shared_libs: [
+        "libbinder",
+        "libbinder_ndk",
+        "liblog",
+        "libutils",
+    ],
+    init_rc: ["ltw_virtual_keyboard.rc"],
+}

@@ -1,0 +1,14 @@
+// Link to Windows (com.microsoft.appmanager), Microsoft-signed; NEVER re-sign. Preinstalled as a
+// priv-app like OnePlus (/my_stock/priv-app/LinktoWindows) so its MediaProjection token is
+// privileged; Play updates replace it and keep PRIVILEGED. Drop the APK here as LinktoWindows.apk.
+android_app_import {
+    name: "LinktoWindows",
+    apk: "LinktoWindows.apk",
+    presigned: true,
+    privileged: true,
+    system_ext_specific: true,
+    dex_preopt: {
+        enabled: false,
+    },
+    required: ["privapp-permissions-ltw.xml"],
+}

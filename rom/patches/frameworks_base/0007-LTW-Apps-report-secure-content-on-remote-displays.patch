@@ -1,0 +1,155 @@
+From 158e8e0b95ee2e03c2d30968baa6f212bba3fd07 Mon Sep 17 00:00:00 2001
+From: FuSan21 <FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 05:10:57 +0600
+Subject: [PATCH] LTW: Apps - report secure content on remote displays
+
+Like OnePlus RemoteTaskHandler.isRemoteTaskInstanceShowingSecuredContent:
+FLAG_SECURE on the remote display's focused window. Polled once a second
+while remote tasks exist (a page can turn secure without a task change, e.g.
+Chrome incognito) and reported through notifyRemoteShowingSecuredContentChanged.
+Read reflectively from WindowManagerService so the same source also runs in
+the rooted emulation module.
+---
+ .../server/wm/LtwRemoteTaskManager.java       | 98 ++++++++++++++++++-
+ 1 file changed, 97 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/wm/LtwRemoteTaskManager.java b/services/core/java/com/android/server/wm/LtwRemoteTaskManager.java
+index d06d071..259e0ff 100644
+--- a/services/core/java/com/android/server/wm/LtwRemoteTaskManager.java
++++ b/services/core/java/com/android/server/wm/LtwRemoteTaskManager.java
+@@ -105,6 +105,24 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
+         }
+     };
+     private boolean mListening;
++    private final SecureContentProbe mSecureProbe = new SecureContentProbe();
++    /** OnePlus reports secure-content changes as they happen; poll while remote tasks exist. */
++    private static final long SECURE_POLL_MS = 1000;
++    private final Runnable mSecurePoll = new Runnable() {
++        @Override
++        public void run() {
++            if (mTasks.isEmpty()) return;
++            for (RemoteTask task : mTasks.values()) {
++                final boolean secure = mSecureProbe.isFocusedWindowSecure(task.getDisplayId());
++                if (secure != task.mShowingSecure) {
++                    task.mShowingSecure = secure;
++                    Slog.i(TAG, "remote task " + task.mUuid + " secure content=" + secure);
++                    mService.notifyRemoteShowingSecuredContentChanged(task, secure);
++                }
++            }
++            mHandler.postDelayed(this, SECURE_POLL_MS);
++        }
++    };
+ 
+     LtwRemoteTaskManager(Context context, CrossDeviceService service) {
+         mContext = context;
+@@ -218,6 +236,8 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
+                 + "@" + info[2] + ") for " + task.mPackageName);
+         final RemoteTask activated = task;
+         mHandler.post(() -> mService.activateRemoteTask(activated));
++        mHandler.removeCallbacks(mSecurePoll);
++        mHandler.postDelayed(mSecurePoll, SECURE_POLL_MS);
+         return out;
+     }
+ 
+@@ -299,6 +319,80 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
+         if (notify) mService.notifyRemoteTaskRemoved(task.mUuid, reason);
+     }
+ 
++    // ------------------------------------------------------------------ secure content
++
++    /**
++     * Is the focused window on a display FLAG_SECURE? (OnePlus: displayContent.mCurrentFocus.mAttrs
++     * .flags & FLAG_SECURE.) Read reflectively from WindowManagerService, which ServiceManager hands
++     * out as the local object inside system_server, so this one source also works from the rooted
++     * emulation module (a different class loader, where package-private access would fail).
++     */
++    static final class SecureContentProbe {
++        private Object mWms;
++        private Object mLock;
++        private Object mRoot;
++        private java.lang.reflect.Method mGetDisplayContent;
++        private java.lang.reflect.Field mCurrentFocus;
++        private java.lang.reflect.Field mAttrs;
++        private boolean mFailed;
++
++        synchronized boolean isFocusedWindowSecure(int displayId) {
++            if (mFailed) return false;
++            try {
++                if (mWms == null) {
++                    mWms = android.os.ServiceManager.getService(Context.WINDOW_SERVICE);
++                    mLock = field(mWms.getClass(), "mGlobalLock").get(mWms);
++                    mRoot = field(mWms.getClass(), "mRoot").get(mWms);
++                    mGetDisplayContent = method(mRoot.getClass(), "getDisplayContent", int.class);
++                }
++                final Object focus;
++                synchronized (mLock) {
++                    final Object dc = mGetDisplayContent.invoke(mRoot, displayId);
++                    if (dc == null) return false;
++                    if (mCurrentFocus == null) mCurrentFocus = field(dc.getClass(), "mCurrentFocus");
++                    focus = mCurrentFocus.get(dc);
++                    if (focus == null) return false;
++                    if (mAttrs == null) mAttrs = field(focus.getClass(), "mAttrs");
++                    final android.view.WindowManager.LayoutParams attrs =
++                            (android.view.WindowManager.LayoutParams) mAttrs.get(focus);
++                    return (attrs.flags & android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0;
++                }
++            } catch (ReflectiveOperationException | RuntimeException e) {
++                Slog.w(TAG, "secure-content probe unavailable", e);
++                mFailed = true; // degrade to "not secure" (the PC then shows SurfaceFlinger's black)
++                return false;
++            }
++        }
++
++        private static java.lang.reflect.Field field(Class<?> c, String name)
++                throws NoSuchFieldException {
++            for (Class<?> k = c; k != null; k = k.getSuperclass()) {
++                try {
++                    java.lang.reflect.Field f = k.getDeclaredField(name);
++                    f.setAccessible(true);
++                    return f;
++                } catch (NoSuchFieldException ignored) {
++                    // walk up
++                }
++            }
++            throw new NoSuchFieldException(name);
++        }
++
++        private static java.lang.reflect.Method method(Class<?> c, String name, Class<?>... p)
++                throws NoSuchMethodException {
++            for (Class<?> k = c; k != null; k = k.getSuperclass()) {
++                try {
++                    java.lang.reflect.Method m = k.getDeclaredMethod(name, p);
++                    m.setAccessible(true);
++                    return m;
++                } catch (NoSuchMethodException ignored) {
++                    // walk up
++                }
++            }
++            throw new NoSuchMethodException(name);
++        }
++    }
++
+     // ------------------------------------------------------------------ one remote task
+ 
+     /** == OnePlus RemoteTaskHandler: the IServiceRemoteTaskInstance handed to deviceintegrationservice. */
+@@ -310,6 +404,7 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
+         final String mPackageName;
+         volatile boolean mHasFocus;
+         volatile boolean mHadTask;
++        volatile boolean mShowingSecure;
+         final java.util.Set<Integer> mTaskIds =
+                 java.util.concurrent.ConcurrentHashMap.newKeySet();
+ 
+@@ -441,7 +536,8 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
+ 
+         @Override
+         public boolean isRemoteTaskInstanceShowingSecuredContent() {
+-            return false; // TODO: FLAG_SECURE focus window on the remote display (OnePlus checks it)
++            // OnePlus RemoteTaskHandler: FLAG_SECURE on the remote display's focused window.
++            return mSecureProbe.isFocusedWindowSecure(getDisplayId());
+         }
+ 
+         @Override
+-- 
+2.56.1.windows.1
+

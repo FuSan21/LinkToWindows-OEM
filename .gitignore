@@ -1,0 +1,11 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+# Microsoft APKs are never committed (supplied by the user)
+*.apk
+# release signing material
+*.jks
+*.keystore

@@ -1,0 +1,6 @@
+# /dev/uinput is 0660 uhid:uhid (ueventd), so run with group uhid.
+service ltw_virtual_keyboard /system_ext/bin/ltw_virtual_keyboard
+    class main
+    user system
+    group system uhid
+    capabilities

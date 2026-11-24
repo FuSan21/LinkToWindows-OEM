@@ -1,0 +1,123 @@
+From f4c91dc79be58d1a63b64d625e8e849b62dd99e4 Mon Sep 17 00:00:00 2001
+From: FuSan21 <FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 03:33:19 +0600
+Subject: [PATCH] LTW: keep the black-screen overlay out of the PC mirror and
+ out of input
+
+deviceintegrationservice's black screen (window type 2099) blanks the phone
+while Link to Windows mirrors it and the PC controls it.
+
+1. Mirror: AUTO_MIRROR content recording copies the whole display. Like
+   OnePlus (which treats 2099 like a rounded-corner overlay), mark it
+   SKIP_SCREENSHOT so SurfaceFlinger leaves it out of screenshots and the
+   PC mirror:
+   - WindowStateAnimator: SKIP_SCREENSHOT surface flag (server-created
+     surfaces);
+   - WindowState.setClientSurface: on Android 17 window surfaces are usually
+     client-created and bypass that flag, so mark the window container.
+2. Input: PC touches are injected on display 0 and would hit the full-screen
+   overlay first. Make it NOT_FOCUSABLE|NOT_TOUCHABLE like
+   TYPE_SECURE_SYSTEM_OVERLAY (DisplayPolicy.adjustWindowParamsLw), and a
+   trusted overlay (InputMonitor), so touches pass through without
+   untrusted-occlusion blocking.
+3. WindowState: force seamless rotation for type 2099.
+
+Not replicated from OnePlus: WindowToken.makeSurface setParent(null), and
+the power-key dismissal (BlackScreenWindowManager) which needs a custom
+IWindow method.
+---
+ .../core/java/com/android/server/wm/DisplayPolicy.java    | 3 +++
+ .../core/java/com/android/server/wm/InputMonitor.java     | 6 +++++-
+ services/core/java/com/android/server/wm/WindowState.java | 8 +++++++-
+ .../java/com/android/server/wm/WindowStateAnimator.java   | 5 ++++-
+ 4 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/services/core/java/com/android/server/wm/DisplayPolicy.java b/services/core/java/com/android/server/wm/DisplayPolicy.java
+index 34106a6..3e4ad13 100644
+--- a/services/core/java/com/android/server/wm/DisplayPolicy.java
++++ b/services/core/java/com/android/server/wm/DisplayPolicy.java
+@@ -165,6 +165,7 @@ import com.android.server.LocalServices;
+ import com.android.server.UiModeManagerInternal;
+ import com.android.server.UiThread;
+ import com.android.server.notification.NotificationManagerInternal;
++import com.android.server.policy.WindowManagerPolicy;
+ import com.android.server.policy.WindowManagerPolicy.ScreenOnListener;
+ import com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs;
+ import com.android.server.statusbar.StatusBarManagerInternal;
+@@ -1024,6 +1025,8 @@ public class DisplayPolicy {
+         switch (attrs.type) {
+             case TYPE_SYSTEM_OVERLAY:
+             case TYPE_SECURE_SYSTEM_OVERLAY:
++            // Link to Windows black screen: must not swallow the PC's injected touches.
++            case WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY:
+                 // These types of windows can't receive input events.
+                 attrs.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+diff --git a/services/core/java/com/android/server/wm/InputMonitor.java b/services/core/java/com/android/server/wm/InputMonitor.java
+index 9e5ec45..79b9491 100644
+--- a/services/core/java/com/android/server/wm/InputMonitor.java
++++ b/services/core/java/com/android/server/wm/InputMonitor.java
+@@ -67,6 +67,7 @@ import android.view.WindowManager;
+ import com.android.internal.annotations.VisibleForTesting;
+ import com.android.internal.inputmethod.SoftInputShowHideReason;
+ import com.android.internal.protolog.ProtoLog;
++import com.android.server.policy.WindowManagerPolicy;
+ import com.android.server.LocalServices;
+ import com.android.server.inputmethod.InputMethodManagerInternal;
+ 
+@@ -743,6 +744,9 @@ final class InputMonitor {
+                 || type == TYPE_ACCESSIBILITY_OVERLAY
+                 || type == TYPE_INPUT_CONSUMER
+                 || type == TYPE_VOICE_INTERACTION
+-                || type == TYPE_STATUS_BAR_ADDITIONAL;
++                || type == TYPE_STATUS_BAR_ADDITIONAL
++                // Link to Windows drag-and-drop / black-screen overlays (as OnePlus does).
++                || type == WindowManagerPolicy.TYPE_LTW_DRAGDROP_OVERLAY
++                || type == WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY;
+     }
+ }
+diff --git a/services/core/java/com/android/server/wm/WindowState.java b/services/core/java/com/android/server/wm/WindowState.java
+index da4da6a..9f69ffa 100644
+--- a/services/core/java/com/android/server/wm/WindowState.java
++++ b/services/core/java/com/android/server/wm/WindowState.java
+@@ -1084,7 +1084,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+         mViewVisibility = viewVisibility;
+         mPolicy = mWmService.mPolicy;
+         mContext = mWmService.mContext;
+-        mForceSeamlesslyRotate = token.mRoundedCornerOverlay;
++        mForceSeamlesslyRotate = token.mRoundedCornerOverlay
++                || a.type == WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY;
+         mLastReportedActivityWindowInfo = mActivityRecord != null
+                 ? new ActivityWindowInfo()
+                 : null;
+@@ -3456,6 +3457,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+         mWinAnimator.mSurfaceControl = isClientLocal()
+                 ? new SurfaceControl(surface, "setClientSurface") : surface;
+         getPendingTransaction().reparent(surface, mSurfaceControl);
++        if (mAttrs.type == WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY) {
++            // Link to Windows: client-created surfaces bypass WindowStateAnimator's
++            // SKIP_SCREENSHOT flag; mark the container so the black screen stays off the PC mirror.
++            getPendingTransaction().setSkipScreenshot(mSurfaceControl, true);
++        }
+         mWinAnimator.resetDrawState();
+         setHasSurface(true);
+         mInputWindowHandle.forceChange();
+diff --git a/services/core/java/com/android/server/wm/WindowStateAnimator.java b/services/core/java/com/android/server/wm/WindowStateAnimator.java
+index 27df627..7acb5f9 100644
+--- a/services/core/java/com/android/server/wm/WindowStateAnimator.java
++++ b/services/core/java/com/android/server/wm/WindowStateAnimator.java
+@@ -304,7 +304,10 @@ class WindowStateAnimator {
+         int flags = SurfaceControl.HIDDEN;
+         final WindowManager.LayoutParams attrs = w.mAttrs;
+ 
+-        if ((mWin.mAttrs.privateFlags & PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0) {
++        if ((mWin.mAttrs.privateFlags & PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0
++                // Link to Windows: keep deviceintegrationservice's black screen out of
++                // screenshots and of the PC mirror (as OnePlus does).
++                || attrs.type == WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY) {
+             flags |= SurfaceControl.SKIP_SCREENSHOT;
+         }
+ 
+-- 
+2.56.1.windows.1
+

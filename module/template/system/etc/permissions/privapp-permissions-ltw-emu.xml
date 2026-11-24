@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Emulation allowlist. Device has ro.control_privapp_permissions=enforce, so this must list EVERY
+  privileged permission each priv-app requests (computed from this device's own definitions,
+  `pm list permissions -f`, Android 17 CP3A.261005.002.A1). A missing entry can prevent boot.
+  DIS block == vendor/ltw/permissions/privapp-permissions-ltw.xml.
+-->
+<permissions>
+    <privapp-permissions package="com.microsoft.deviceintegrationservice">
+        <permission name="deviceintegration.permission.MANAGE_CROSS_DEVICE" />
+        <permission name="android.permission.CAPTURE_AUDIO_OUTPUT" />
+        <permission name="android.permission.MODIFY_AUDIO_ROUTING" />
+        <permission name="android.permission.OVERRIDE_WIFI_CONFIG" />
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE" />
+        <permission name="android.permission.REAL_GET_TASKS" />
+        <permission name="android.permission.TETHER_PRIVILEGED" />
+    </privapp-permissions>
+    <!-- On Lineage the broker is platform-signed /system_ext/app and needs no allowlist. -->
+    <privapp-permissions package="com.microsoftsdk.crossdeviceservicebroker">
+        <permission name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
+        <permission name="deviceintegration.permission.MANAGE_CROSS_DEVICE" />
+    </privapp-permissions>
+    <!-- Link to Windows (appmanager). OEMs preinstall it as a priv-app (OnePlus:
+         /my_stock/priv-app/LinktoWindows); the Play version then installs as an update and keeps
+         PRIVILEGED. Privileged => its MediaProjection token is "privileged", so Android does not
+         demand a mediaProjection-type FGS (MediaProjectionManagerService.requiresForegroundService).
+         Allow/deny mirrors OnePlus privapp_permission_ltw.xml; the last three are requested only by
+         newer versions (1.26102) and are allowed. Every privileged permission must be listed. -->
+    <privapp-permissions package="com.microsoft.appmanager">
+        <permission name="android.permission.READ_WALLPAPER_INTERNAL" />
+        <permission name="android.permission.REQUEST_COMPANION_PROFILE_COMPUTER" />
+        <permission name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
+        <permission name="android.permission.LOCAL_MAC_ADDRESS" />
+        <permission name="android.permission.MANAGE_WIFI_NETWORK_SELECTION" />
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE" />
+        <deny-permission name="android.permission.CAPTURE_AUDIO_OUTPUT" />
+        <deny-permission name="android.permission.CAPTURE_MEDIA_OUTPUT" />
+        <deny-permission name="android.permission.MODIFY_AUDIO_ROUTING" />
+    </privapp-permissions>
+</permissions>

@@ -1,0 +1,20 @@
+prebuilt_etc {
+    name: "privapp-permissions-ltw.xml",
+    system_ext_specific: true,
+    sub_dir: "permissions",
+    src: "privapp-permissions-ltw.xml",
+}
+
+prebuilt_etc {
+    name: "default-permissions-ltw.xml",
+    system_ext_specific: true,
+    sub_dir: "default-permissions",
+    src: "default-permissions-ltw.xml",
+}
+
+prebuilt_etc {
+    name: "hidden-api-allowlist-ltw.xml",
+    system_ext_specific: true,
+    sub_dir: "sysconfig",
+    src: "hidden-api-allowlist-ltw.xml",
+}

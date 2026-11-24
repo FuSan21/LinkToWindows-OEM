@@ -1,0 +1,17 @@
+// Microsoft-signed; NEVER re-sign (DIS's caller allowlist and MSA auth depend on the signature).
+// Drop the APK here as DeviceIntegrationService.apk (not committed - see .gitignore).
+android_app_import {
+    name: "DeviceIntegrationService",
+    apk: "DeviceIntegrationService.apk",
+    presigned: true,
+    privileged: true,
+    system_ext_specific: true,
+    dex_preopt: {
+        enabled: false,
+    },
+    required: [
+        "privapp-permissions-ltw.xml",
+        "default-permissions-ltw.xml",
+        "hidden-api-allowlist-ltw.xml",
+    ],
+}

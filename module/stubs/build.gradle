@@ -1,0 +1,19 @@
+// Compile-only stubs for hidden framework APIs used by the shared rom/ sources (signatures verified against
+// lineage-24.0 / Android 17). Consumed with compileOnly; never packaged.
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+def props = new Properties()
+def lp = rootProject.file('local.properties')
+if (lp.exists()) lp.withInputStream { props.load(it) }
+def sdkDir = props.getProperty('sdk.dir') ?: System.getenv('ANDROID_HOME')
+
+dependencies {
+    compileOnly files("${sdkDir}/platforms/android-36/android.jar")
+}

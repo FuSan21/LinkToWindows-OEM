@@ -1,0 +1,104 @@
+From 208006f723039d5a26785d530ca8a8919171d101 Mon Sep 17 00:00:00 2001
+From: FuSan21 <FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 02:57:11 +0600
+Subject: [PATCH] LTW: allow deviceintegrationservice black-screen/drag-drop
+ overlays
+
+Link to Windows OEM integration. deviceintegrationservice adds full-screen
+overlays of window type 2099 (black screen while mirroring) and 2098 (drag
+and drop). AOSP has no such types, so the add fails with
+BadTokenException and crashes deviceintegrationservice once mirroring
+starts.
+
+Mirror OnePlus PhoneWindowManagerExtImpl.overrideCheckAddPermission:
+allow both types iff the caller holds MANAGE_CROSS_DEVICE and is
+com.microsoft.deviceintegrationservice, and give them a real layer
+(above system bars) instead of 'Unknown window type'.
+
+Open: OnePlus also keeps the black screen out of the mirrored content;
+not reproduced yet.
+---
+ .../server/policy/PhoneWindowManager.java     | 28 +++++++++++++++++++
+ .../server/policy/WindowManagerPolicy.java    | 13 +++++++++
+ 2 files changed, 41 insertions(+)
+
+diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+index e17c6ae..e27b9d2 100644
+--- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -3653,6 +3653,26 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 && mWakeGestureListener.isSupported();
+     }
+ 
++    /** == CrossDeviceManager.isCallerAllowed() (com.microsoft.device-private), for the caller. */
++    private boolean isLtwCrossDeviceCaller() {
++        if (mContext.checkCallingPermission("deviceintegration.permission.MANAGE_CROSS_DEVICE")
++                != PERMISSION_GRANTED) {
++            return false;
++        }
++        final int uid = Binder.getCallingUid();
++        final long token = Binder.clearCallingIdentity();
++        try {
++            final String[] pkgs = mContext.getPackageManager().getPackagesForUid(uid);
++            if (pkgs == null) return false;
++            for (String p : pkgs) {
++                if ("com.microsoft.deviceintegrationservice".equals(p)) return true;
++            }
++            return false;
++        } finally {
++            Binder.restoreCallingIdentity(token);
++        }
++    }
++
+     /** {@inheritDoc} */
+     @Override
+     public int checkAddPermission(int type, boolean isRoundedCornerOverlay, String packageName,
+@@ -3664,6 +3684,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+ 
+         outAppOp[0] = AppOpsManager.OP_NONE;
+ 
++        // Link to Windows OEM integration (OnePlus PhoneWindowManagerExtImpl
++        // .overrideCheckAddPermission): deviceintegrationservice's drag-and-drop and black-screen
++        // overlays are allowed iff the caller passes CrossDeviceManager.isCallerAllowed.
++        if (type == WindowManagerPolicy.TYPE_LTW_DRAGDROP_OVERLAY
++                || type == WindowManagerPolicy.TYPE_LTW_BLACKSCREEN_OVERLAY) {
++            return isLtwCrossDeviceCaller() ? ADD_OKAY : ADD_PERMISSION_DENIED;
++        }
++
+         if (!((type >= FIRST_APPLICATION_WINDOW && type <= LAST_APPLICATION_WINDOW)
+                 || (type >= FIRST_SUB_WINDOW && type <= LAST_SUB_WINDOW)
+                 || (type >= FIRST_SYSTEM_WINDOW && type <= LAST_SYSTEM_WINDOW))) {
+diff --git a/services/core/java/com/android/server/policy/WindowManagerPolicy.java b/services/core/java/com/android/server/policy/WindowManagerPolicy.java
+index a749751..47b5df9 100644
+--- a/services/core/java/com/android/server/policy/WindowManagerPolicy.java
++++ b/services/core/java/com/android/server/policy/WindowManagerPolicy.java
+@@ -521,6 +521,14 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
+      *                             overlay.
+      * @return int An arbitrary integer used to order windows, with lower numbers below higher ones.
+      */
++    /**
++     * Link to Windows OEM window types, used by com.microsoft.deviceintegrationservice (it reads
++     * WindowManager.LayoutParams.TYPE_SYSTEM_{DRAGDROP,BLACKSCREEN}_OVERLAY reflectively and falls
++     * back to these values; OnePlus defines them identically).
++     */
++    int TYPE_LTW_DRAGDROP_OVERLAY = 2098;
++    int TYPE_LTW_BLACKSCREEN_OVERLAY = 2099;
++
+     default int getWindowLayerFromTypeLw(int type, boolean canAddInternalSystemWindow,
+             boolean roundedCornerOverlay) {
+         // Always put the rounded corner layer to the top most.
+@@ -531,6 +539,11 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
+             return APPLICATION_LAYER;
+         }
+ 
++        if (type == TYPE_LTW_DRAGDROP_OVERLAY || type == TYPE_LTW_BLACKSCREEN_OVERLAY) {
++            // Above status/navigation bars, like TYPE_SECURE_SYSTEM_OVERLAY.
++            return 33;
++        }
++
+         switch (type) {
+             case TYPE_WALLPAPER:
+                 // wallpaper is at the bottom, though the window manager may move it.
+-- 
+2.56.1.windows.1
+

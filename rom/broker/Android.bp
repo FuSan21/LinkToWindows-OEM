@@ -1,0 +1,20 @@
+// com.microsoftsdk.crossdeviceservicebroker -> /system_ext/app/CrossDeviceServiceBroker
+// Must be platform-signed: MANAGE_MEDIA_PROJECTION is protectionLevel="signature" on Android 17.
+android_app {
+    name: "CrossDeviceServiceBroker",
+    system_ext_specific: true,
+    certificate: "platform",
+    privileged: false,
+    platform_apis: true,
+    srcs: [
+        "src/**/*.java",
+        "aidl/**/*.aidl",
+    ],
+    aidl: {
+        local_include_dirs: ["aidl"],
+    },
+    manifest: "AndroidManifest.xml",
+    dex_preopt: {
+        enabled: false,
+    },
+}

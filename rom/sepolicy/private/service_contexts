@@ -1,0 +1,2 @@
+cross_device_service                      u:object_r:cross_device_service:s0
+vendor.virtual_keyboard                   u:object_r:ltw_virtual_keyboard_service:s0

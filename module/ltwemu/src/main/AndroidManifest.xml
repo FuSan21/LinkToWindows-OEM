@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="LTW OEM emulation"
+        android:description="@string/xposed_description">
+        <meta-data android:name="xposeddescription" android:value="Emulates the LineageOS LTW OEM framework patch on rooted stock" />
+    </application>
+</manifest>

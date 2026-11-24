@@ -1,0 +1,10 @@
+// The same android.app.* AIDL is compiled twice:
+//  * into com.microsoft.device-private (app side, loaded by deviceintegrationservice's ClassLoader)
+//  * into ltw-crossdevice-aidl-server -> services.core (system_server side)
+// They never meet in one ClassLoader: the boot class path contains neither copy.
+filegroup {
+    name: "ltw-crossdevice-aidl",
+    srcs: ["android/app/*.aidl"],
+    path: ".",
+    visibility: ["//visibility:public"],
+}

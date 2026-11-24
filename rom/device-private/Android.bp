@@ -1,0 +1,21 @@
+// Shared library "com.microsoft.device-private" -> /system_ext/framework/com.microsoft.device-private.jar
+java_library {
+    name: "com.microsoft.device-private",
+    installable: true,
+    system_ext_specific: true,
+    srcs: [
+        "java/**/*.java",
+        ":ltw-crossdevice-aidl",
+    ],
+    // Compiled against the full platform (needs ServiceManager, which is @UnsupportedAppUsage and
+    // therefore callable from app-domain code at runtime).
+    platform_apis: true,
+    required: ["com.microsoft.device-private.xml"],
+}
+
+prebuilt_etc {
+    name: "com.microsoft.device-private.xml",
+    system_ext_specific: true,
+    sub_dir: "permissions",
+    src: "com.microsoft.device-private.xml",
+}

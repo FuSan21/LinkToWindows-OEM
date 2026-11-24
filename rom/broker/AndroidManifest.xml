@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mirrors OnePlus 12 /system/app/CrossDeviceServiceBroker (docs/OEM_INTEGRATION_PLAN.md 8f). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.microsoftsdk.crossdeviceservicebroker">
+
+    <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.MANAGE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Not on OnePlus. Makes deviceintegrationservice use the broker's black screen ("V2",
+         BlackScreen.java) and lets it block the phone's own touches with a gesture monitor. -->
+    <uses-permission android:name="android.permission.MONITOR_INPUT" />
+    <!-- UDFPS location (FingerprintManager.getSensorPropertiesInternal): touches on the sensor
+         are not blocked, so BiometricPrompt keeps working under the black screen. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC_INTERNAL" />
+    <!-- Not on OnePlus (they hook BackgroundActivityStartController instead). launch() starts
+         activities while the broker is only bound, so let the platform cert grant BAL. -->
+    <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
+    <uses-permission android:name="deviceintegration.permission.MANAGE_CROSS_DEVICE" />
+    <uses-permission android:name="deviceintegration.permission.ACCESS_DEVICE_INTEGRATION" />
+
+    <queries>
+        <package android:name="com.microsoft.appmanager" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:persistent="false"
+        android:usesNonSdkApi="true">
+        <service
+            android:name=".CrossDeviceServiceBroker"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="deviceintegration.permission.MANAGE_CROSS_DEVICE">
+            <intent-filter>
+                <action android:name="com.microsoftsdk.crossdeviceservicebroker.ICrossDeviceServiceBroker" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

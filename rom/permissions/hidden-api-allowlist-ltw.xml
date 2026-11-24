@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Exempt deviceintegrationservice (a Microsoft-signed system app) from hidden-API enforcement.
+  OnePlus ships the same entry in /system_ext/etc/sysconfig/hidden-api-whitelist-ext.xml
+  ("Add for MS-LTW"). Without it DIS can't use ServiceManager.waitForService or the
+  projection/display reflection it relies on. On the rooted test route this needed
+  `settings put global hidden_api_policy 1`.
+  Only honoured for system/updated-system apps (ApplicationInfo.isAllowedToUseHiddenApis).
+-->
+<config>
+    <hidden-api-whitelisted-app package="com.microsoft.deviceintegrationservice" />
+</config>

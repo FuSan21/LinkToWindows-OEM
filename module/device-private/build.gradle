@@ -1,0 +1,71 @@
+// Builds com.microsoft.device-private.jar (shared library, dex jar) from the SAME sources the
+// Lineage build uses: rom/device-private/java + rom/aidl.
+plugins {
+    id 'com.android.application'
+}
+
+def ltw = "${rootDir}/rom"
+
+android {
+    namespace = 'me.ayra.ltw.devicepriv'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'me.ayra.ltw.devicepriv.buildonly'
+        minSdk = 32
+        targetSdk = 36
+        versionCode = 1
+        versionName = '1.0'
+    }
+    buildTypes {
+        release {
+            minifyEnabled = false
+            signingConfig = signingConfigs.debug
+        }
+    }
+    buildFeatures {
+        aidl = true
+        buildConfig = false
+        resValues = false
+    }
+    sourceSets {
+        main {
+            java.srcDirs = ["${ltw}/device-private/java"]
+            aidl.srcDirs = ["${ltw}/aidl"]
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    compileOnly project(':stubs')
+}
+
+// apk -> jar containing only classes*.dex (resolved at execution time)
+tasks.register('deviceprivateJar') {
+    dependsOn 'assembleRelease'
+    def outDir = layout.buildDirectory.dir('ltw')
+    def apkDir = layout.buildDirectory.dir('outputs/apk/release')
+    inputs.dir apkDir
+    outputs.dir outDir
+    doLast {
+        def apk = apkDir.get().asFile.listFiles().find { it.name.endsWith('.apk') }
+        if (apk == null) throw new GradleException('release APK not found')
+        def out = outDir.get().file('com.microsoft.device-private.jar').asFile
+        out.parentFile.mkdirs()
+        ant.zip(destfile: out) {
+            zipfileset(src: apk, includes: 'classes*.dex')
+        }
+        println "device-private jar: ${out}"
+    }
+}
+
+// AGP 9 adds kotlin-stdlib implicitly; these are pure-Java system components, so keep it out of
+// what gets packaged (only the runtime classpaths; lint still needs its own Kotlin).
+configurations.matching { it.name.endsWith('RuntimeClasspath') }.configureEach {
+    exclude group: 'org.jetbrains.kotlin'
+    exclude group: 'org.jetbrains'
+}

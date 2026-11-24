@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From OnePlus default_grant_permissions_ltw.xml. -->
+<exceptions>
+    <exception package="com.microsoft.deviceintegrationservice">
+        <permission name="android.permission.POST_NOTIFICATIONS" fixed="false" />
+    </exception>
+</exceptions>

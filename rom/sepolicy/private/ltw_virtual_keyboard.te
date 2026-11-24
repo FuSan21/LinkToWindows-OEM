@@ -1,0 +1,17 @@
+# vendor.virtual_keyboard daemon (rom/virtual_keyboard).
+type ltw_virtual_keyboard, domain, coredomain;
+type ltw_virtual_keyboard_exec, system_file_type, exec_type, file_type;
+init_daemon_domain(ltw_virtual_keyboard)
+
+binder_use(ltw_virtual_keyboard)
+add_service(ltw_virtual_keyboard, ltw_virtual_keyboard_service)
+# Authorization: checkCallingPermission(MANAGE_CROSS_DEVICE) asks the permission service.
+allow ltw_virtual_keyboard permission_service:service_manager find;
+binder_call(ltw_virtual_keyboard, system_server)
+
+# deviceintegrationservice (a priv-app) attaches/sends keys; the daemon links to its death.
+binder_call(priv_app, ltw_virtual_keyboard)
+binder_call(ltw_virtual_keyboard, priv_app)
+
+# uinput keyboard
+allow ltw_virtual_keyboard uhid_device:chr_file rw_file_perms;

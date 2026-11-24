@@ -1,0 +1,24 @@
+// Release signing for the module APKs (broker + LSPosed module).
+// Set LTW_KEYSTORE (path), LTW_KEYSTORE_PASSWORD, LTW_KEY_ALIAS, LTW_KEY_PASSWORD to sign with a
+// stable key (the GitHub release does, so updates install over each other). Without them the
+// Android debug key is used: fine for personal builds, but a different machine = different key.
+def ks = System.getenv('LTW_KEYSTORE')
+android {
+    signingConfigs {
+        ltw {
+            if (ks) {
+                storeFile = file(ks)
+                storePassword = System.getenv('LTW_KEYSTORE_PASSWORD')
+                keyAlias = System.getenv('LTW_KEY_ALIAS')
+                keyPassword = System.getenv('LTW_KEY_PASSWORD')
+            } else {
+                initWith(signingConfigs.debug)
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.ltw
+        }
+    }
+}
