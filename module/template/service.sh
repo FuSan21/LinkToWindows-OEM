@@ -7,18 +7,28 @@ EMU=me.ayra.ltw.emu
 LSPD_CLI=/data/adb/lspd/cli
 chmod 0755 "$BIN"
 
-# SELinux: sepolicy.rule covers priv_app and priv_app_36. Android 17 runs priv-apps in
-# priv_app_<targetSdk>, so if a newer deviceintegrationservice targets a newer SDK, allow that
-# domain too (it must find cross_device_service).
+# KernelSU Next can start the service stage twice in one boot; run once per boot (/dev is tmpfs).
+mkdir /dev/ltw_oem_service 2>/dev/null || exit 0
+
+# SELinux: sepolicy.rule covers priv_app and priv_app_36. Android 17+ maps priv-apps to
+# per-targetSdk domains through seapp_contexts (e.g. targetSdk >= 37 -> priv_app, below ->
+# priv_app_36). A newer platform may define more such domains: allow those too (deviceintegration
+# service must find cross_device_service). Only domains named in seapp_contexts, i.e. types that
+# exist: patching a type that does not exist fails, and on some 4.x kernels (KernelSU Next 3.3,
+# DerpFest nabu 4.14) that failure hangs the whole device.
 dis_domain_rule() {
-    sdk=$(dumpsys package "$DIS" 2>/dev/null | sed -n 's/.*targetSdk=\([0-9]*\).*/\1/p' | head -1)
-    [ -n "$sdk" ] && [ "$sdk" != 36 ] || return 0
-    rule="allow priv_app_$sdk default_android_service service_manager find"
-    if command -v ksud >/dev/null 2>&1; then
-        ksud sepolicy patch "$rule"
-    elif command -v magiskpolicy >/dev/null 2>&1; then
-        magiskpolicy --live "$rule"
-    fi
+    for f in /system/etc/selinux/plat_seapp_contexts /system_ext/etc/selinux/system_ext_seapp_contexts \
+        /product/etc/selinux/product_seapp_contexts /vendor/etc/selinux/vendor_seapp_contexts; do
+        [ -f "$f" ] && grep 'isPrivApp=true' "$f"
+    done | sed -n 's/.*domain=\(priv_app_[0-9]*\).*/\1/p' | sort -u | while read -r domain; do
+        [ "$domain" = priv_app_36 ] && continue
+        rule="allow $domain default_android_service service_manager find"
+        if command -v ksud >/dev/null 2>&1; then
+            ksud sepolicy patch "$rule"
+        elif command -v magiskpolicy >/dev/null 2>&1; then
+            magiskpolicy --live "$rule"
+        fi
+    done
 }
 
 # Vector: enable LtwEmu (shipped as a system app) and set its scope once. Hooks load on the next

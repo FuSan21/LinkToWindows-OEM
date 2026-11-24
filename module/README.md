@@ -32,7 +32,7 @@ a few system_server hooks.
 |---|---|---|
 | `ltw_apks.sh` | — | Finds each Microsoft APK: the copy installed as a normal app (base + split APKs), the previous module install, `/sdcard/Download/LinkToWindowsOEM/<Name>.apk`, or a download in `/sdcard/Download` (any name containing "device integration service"). Each new APK is checked by `ApkCheck` (in LtwEmu, run with `app_process`): Android's signature verifier, Microsoft's certificate SHA-256 pinned, package name |
 | `customize.sh` | install | Places the Microsoft APKs it finds; never aborts on a missing one |
-| `service.sh` | every boot | SELinux rule for deviceintegrationservice's `priv_app_<targetSdk>`; enables LtwEmu in Vector once; runs `vendor.virtual_keyboard` |
+| `service.sh` | every boot (once) | SELinux rules for further `priv_app_<n>` domains in `seapp_contexts`; enables LtwEmu in Vector once; runs `vendor.virtual_keyboard` |
 | `action.sh` | Action button | Finishes the setup one step per tap (copies a now-available APK, opens Play for Link to Windows, asks for a reboot), then the health check |
 | `system/app/LtwEmu` | — | The LSPosed/Vector module, shipped as a system app |
 | `module.prop` `updateJson` | — | In-app updates from the latest GitHub release |
@@ -56,7 +56,10 @@ we use V2. The broker (`rom/broker/.../BlackScreen.java`):
 
 ## Lessons (each was a real failure on device)
 
-1. **SELinux:** Android 17 runs priv-apps as `priv_app_<targetSdk>` (`priv_app_36`), not `priv_app`.
+1. **SELinux:** Android 17 runs priv-apps in per-targetSdk domains from `seapp_contexts` (`priv_app_36`
+   for targetSdk below 37), not `priv_app`. Derive domains from `seapp_contexts`, never from the
+   targetSdk: a live patch naming a missing type fails, and on a 4.14 KernelSU Next kernel that hung
+   the whole device.
 2. **Consent screen:** deviceintegrationservice's `MediaProjectionPermissionActivity` needs
    `ACCESS_DEVICE_INTEGRATION`, and the broker is what launches it.
 3. **Link to Windows must be a priv-app.** A non-privileged MediaProjection owner must run a `mediaProjection`

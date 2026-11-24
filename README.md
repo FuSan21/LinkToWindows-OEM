@@ -124,14 +124,16 @@ module. Report the DIS/Link to Windows versions in an issue.
 
 ### Older kernels (4.x)
 
-Tested so far only on a 5.10+ kernel (Pixel 7a). On a Xiaomi Pad 5 (kernel 4.14, KernelSU Next 3.4.2):
+Tested on a 5.10+ kernel (Pixel 7a) and on a Xiaomi Pad 5 (kernel 4.14, DerpFest, KernelSU Next):
 
 - **meta-overlayfs** made every shutdown panic (`ext4_put_super` → `remove_proc_entry`, after ksud's
   `nuke-ext4-sysfs` on its ext4 image). Use a metamodule without an ext4 image there, e.g. Mountify in
   its default tmpfs mode, or a magic-mount metamodule.
-- With Mountify (tmpfs), the tablet **hard-froze on the first boot after installing or updating this
-  module**, while the clean boot in between worked. Cause not confirmed. Until it is, don't use this
-  module on 4.x kernels; if you try, keep a recovery (TWRP) at hand to disable it
+- Earlier module builds **hard-froze the tablet** (watchdog reset) right after boot. Cause: service.sh
+  asked KernelSU to patch SELinux for `priv_app_<targetSdk>` (`priv_app_35`), a domain that platform
+  doesn't define; KernelSU Next on that kernel hangs the device when such a live patch fails. Fixed: the
+  module only patches `priv_app_<n>` domains listed in `seapp_contexts`. If a device still freezes, keep
+  a recovery (TWRP) at hand to disable the module
   (`touch /data/adb/modules/ltw_oem_emulation/disable`).
 
 ### Update / uninstall

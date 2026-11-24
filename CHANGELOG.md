@@ -9,7 +9,8 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
   and scoped automatically. One zip to install.
 - Root module: in-app updates in KernelSU/Magisk (`updateJson`); updates reuse the installed Microsoft APKs.
 - Root module: **Action** button runs a health check.
-- Root module: SELinux rule follows deviceintegrationservice's target SDK (`priv_app_<sdk>`).
+- Root module: SELinux rules for the `priv_app_<n>` domains the platform's `seapp_contexts` defines
+  (Android 17+ runs priv-apps in per-targetSdk domains).
 - ROM: three feature patches (core, black screen, Apps) carrying only call sites; the code moved to
   `rom/services` and is shared with the root module (`LtwWindowPolicy`).
 - ROM: clear build error when a Microsoft APK is missing.
@@ -29,5 +30,9 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
   right after install, or if LtwEmu fails to load): `CrossDeviceManager` behaves like a device without
   the feature.
 - Root module: a module update no longer asks for an extra reboot when LtwEmu is already enabled.
-- Docs: known problems on 4.x kernels (Xiaomi Pad 5): meta-overlayfs shutdown panic, and a freeze on
-  the first boot after installing this module (cause not confirmed yet).
+- Root module: fixed a hard freeze after boot on a 4.14 kernel (Xiaomi Pad 5, KernelSU Next): the live
+  SELinux patch named a domain that doesn't exist (`priv_app_<targetSdk>`), and the failed patch hung
+  the kernel. Only domains from `seapp_contexts` are patched now.
+- Root module: service.sh runs once per boot (KernelSU Next can start the service stage twice, which
+  started two keyboard daemons).
+- Docs: known problems on 4.x kernels (Xiaomi Pad 5): meta-overlayfs shutdown panic.
