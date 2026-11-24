@@ -16,16 +16,16 @@ jobs:
     env:
       TZ: Asia/Dhaka
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # version = git describe, versionCode = commit count
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: 'platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018'
 
@@ -67,14 +67,14 @@ jobs:
           cp module/ltwemu/build/outputs/apk/release/*.apk "dist/LtwEmu-$LTW_VERSION.apk"
           ls -l dist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ltw-oem-${{ env.LTW_VERSION }}
           path: dist/*
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           generate_release_notes: true
