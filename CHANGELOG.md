@@ -19,3 +19,15 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
   finishes the setup (opens Play for Link to Windows) one step per tap.
 - Root module: the Action button reboots by itself (10 s countdown) when a setup step needs it,
   including after Vector enabled LtwEmu; never twice for the same step.
+- Root module: deviceintegrationservice is picked up straight from `/sdcard/Download` (APK-mirror file
+  name); the Action button opens its download page. Every APK is verified with Android's signature
+  verifier against Microsoft's pinned certificate before it becomes a system app.
+- Root module: the installer refuses to install without module mounting (built into Magisk/APatch;
+  a metamodule on KernelSU), Zygisk and Vector/LSPosed, instead of installing a module that does
+  nothing; the Action button reports them.
+- deviceintegrationservice no longer crash-loops while `cross_device_service` is missing (the boot
+  right after install, or if LtwEmu fails to load): `CrossDeviceManager` behaves like a device without
+  the feature.
+- Root module: a module update no longer asks for an extra reboot when LtwEmu is already enabled.
+- Docs: known problems on 4.x kernels (Xiaomi Pad 5): meta-overlayfs shutdown panic, and a freeze on
+  the first boot after installing this module (cause not confirmed yet).

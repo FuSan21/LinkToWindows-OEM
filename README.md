@@ -62,9 +62,15 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
 
 ### Requirements
 
-- Android 17, rooted with **KernelSU** (plus a metamodule such as **Mountify** or **meta-overlayfs**) or
-  **Magisk**.
-- **LSPosed/Vector** with the modern libxposed API (100+).
+- Android 17, rooted with **Magisk** (or a fork), **APatch**, or **KernelSU** / KernelSU Next / SukiSU.
+- **Module mounting**: built into Magisk and APatch. KernelSU needs a **metamodule** (any module that
+  declares `metamodule=1`, e.g. meta-overlayfs, meta-magicmount, Mountify, mountify-rs), unless your
+  build mounts modules by itself.
+- **Zygisk**: Magisk's own (enable it in Magisk); on KernelSU and APatch a provider module such as
+  ReZygisk, NeoZygisk or Zygisk Next.
+- **Vector/LSPosed** with the modern libxposed API (100+).
+- The installer checks all three and refuses to install if one is missing (the module would otherwise
+  do nothing).
 - If you use **Hide My Applist**, exclude `com.microsoft.appmanager`,
   `com.microsoft.deviceintegrationservice` and `com.microsoftsdk.crossdeviceservicebroker` from hiding.
 
@@ -73,13 +79,16 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
 1. Download `ltw_oem_module-<version>.zip` from the [latest release](../../releases/latest). It includes
    LtwEmu, the LSPosed/Vector part, as a system app.
 2. Install **Link to Windows** from Play (optional now: the Action button opens Play for you later).
-3. Copy `DeviceIntegrationService.apk` to `/sdcard/Download/LinkToWindowsOEM/` (create the folder). If
-   you installed it as a normal app instead, that copy is used. Also uninstall any other
+3. Download **Device Integration Service** (the APK, not a bundle) from an APK mirror into
+   `/sdcard/Download/`, keeping its file name, or skip this: the Action button opens the download page
+   later. It is not on Play. Before use, every APK is checked with Android's own signature verifier
+   against Microsoft's certificate (pinned SHA-256), so a fake or tampered file is refused. Also uninstall any other
    `CrossDeviceServiceBroker` / Samsung-port modules: exactly one broker may exist.
 4. Install `ltw_oem_module-<version>.zip` in the KernelSU/Magisk manager. The installer picks up both
    Microsoft apps (from that folder, or the installed copies). It never stops because one is missing.
 5. **Reboot.** If an app was missing, tap the module's **Action** button: it copies what is now
-   available, or opens Play for Link to Windows / says where to put deviceintegrationservice. Tap it
+   available, or opens the download page (APK mirror for deviceintegrationservice, Play for Link to
+   Windows), one per tap. Tap it
    again after each step; when a reboot is needed it counts down 10 s and reboots. Installed copies stay installed as updates of the
    system copies.
 6. Enable **LtwEmu** in LSPosed/Vector with scope **System Framework** and
@@ -109,8 +118,21 @@ adb logcat -s LtwEmu CrossDeviceService LtwBlackScreen
 ### If the phone doesn't boot
 
 Android enforces a privileged-permission allowlist at boot. A Microsoft app version that requests a new
-privileged permission can stop the boot. Boot to **KernelSU safe mode** (hold volume down during boot)
-or Magisk safe mode, then remove the module. Report the DIS/Link to Windows versions in an issue.
+privileged permission can stop the boot. Boot to **KernelSU safe mode** (press-release Volume Down more
+than three times right after the first boot logo; don't hold it) or Magisk safe mode, then remove the
+module. Report the DIS/Link to Windows versions in an issue.
+
+### Older kernels (4.x)
+
+Tested so far only on a 5.10+ kernel (Pixel 7a). On a Xiaomi Pad 5 (kernel 4.14, KernelSU Next 3.4.2):
+
+- **meta-overlayfs** made every shutdown panic (`ext4_put_super` → `remove_proc_entry`, after ksud's
+  `nuke-ext4-sysfs` on its ext4 image). Use a metamodule without an ext4 image there, e.g. Mountify in
+  its default tmpfs mode, or a magic-mount metamodule.
+- With Mountify (tmpfs), the tablet **hard-froze on the first boot after installing or updating this
+  module**, while the clean boot in between worked. Cause not confirmed. Until it is, don't use this
+  module on 4.x kernels; if you try, keep a recovery (TWRP) at hand to disable it
+  (`touch /data/adb/modules/ltw_oem_emulation/disable`).
 
 ### Update / uninstall
 
