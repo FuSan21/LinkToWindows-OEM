@@ -1,0 +1,146 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FuSan21 <35169687+FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 19:47:28 +0600
+Subject: [PATCH 1/3] LTW: core - cross_device_service, MANAGE_CROSS_DEVICE,
+ CrossDeviceManager fetcher
+
+Link to Windows OEM integration (vendor/ltw). Adds vendor/ltw's system_server
+classes (:ltw-services-srcs) and AIDL (ltw-crossdevice-aidl-server) to
+services.core, starts cross_device_service in SystemServer (as OnePlus
+SystemServerExtImpl.addCrossDeviceService), defines
+deviceintegration.permission.MANAGE_CROSS_DEVICE and registers a
+getSystemService("cross_device_service") fetcher that instantiates
+android.app.CrossDeviceManager from the caller's ClassLoader (shared library
+com.microsoft.device-private).
+---
+ .../android/app/SystemServiceRegistry.java    | 37 +++++++++++++++++++
+ core/res/AndroidManifest.xml                  |  7 ++++
+ services/core/Android.bp                      |  2 +
+ .../java/com/android/server/SystemServer.java | 11 ++++++
+ 4 files changed, 57 insertions(+)
+
+diff --git a/core/java/android/app/SystemServiceRegistry.java b/core/java/android/app/SystemServiceRegistry.java
+index cc0e7b5..c9a4a3b 100644
+--- a/core/java/android/app/SystemServiceRegistry.java
++++ b/core/java/android/app/SystemServiceRegistry.java
+@@ -382,6 +382,35 @@ public final class SystemServiceRegistry {
+     // Not instantiable.
+     private SystemServiceRegistry() { }
+ 
++    // Link to Windows OEM integration (see registerCrossDeviceService()).
++    private static final String CROSS_DEVICE_SERVICE = "cross_device_service";
++    private static final String CROSS_DEVICE_MANAGER_CLASS = "android.app.CrossDeviceManager";
++
++    /** Key for SYSTEM_SERVICE_NAMES only; never instantiated. */
++    private static final class CrossDeviceServiceMarker {
++        private CrossDeviceServiceMarker() { }
++    }
++
++    @SuppressWarnings({"unchecked", "rawtypes"})
++    private static void registerCrossDeviceService() {
++        // The fetcher returns an instance of the app-side class, so register it raw: erased
++        // generics mean no cast to CrossDeviceServiceMarker ever happens at runtime.
++        final ServiceFetcher fetcher = new CachedServiceFetcher<Object>() {
++            @Override
++            public Object createService(ContextImpl ctx) {
++                try {
++                    final ClassLoader cl = ctx.getClassLoader();
++                    if (cl == null) return null;
++                    return cl.loadClass(CROSS_DEVICE_MANAGER_CLASS)
++                            .getDeclaredConstructor().newInstance();
++                } catch (ReflectiveOperationException | LinkageError e) {
++                    return null; // app does not load com.microsoft.device-private
++                }
++            }
++        };
++        registerService(CROSS_DEVICE_SERVICE, CrossDeviceServiceMarker.class, fetcher);
++    }
++
+     static {
+         registerServices();
+     }
+@@ -2163,6 +2192,13 @@ public final class SystemServiceRegistry {
+                     });
+         }
+ 
++        // Link to Windows OEM integration. android.app.CrossDeviceManager is NOT in the boot
++        // class path: it ships in the shared library "com.microsoft.device-private", which
++        // deviceintegrationservice loads via <uses-library>. Instantiate it from the calling
++        // app's ClassLoader so the app gets its own class (no hidden-API exposure). Apps without
++        // the library get null, exactly like a device without the feature.
++        registerCrossDeviceService();
++
+ 
+         sInitializing = true;
+         try {
+@@ -2305,6 +2341,7 @@ public final class SystemServiceRegistry {
+                 case Context.CONTEXTHUB_SERVICE:
+                 case Context.VIRTUALIZATION_SERVICE:
+                 case Context.VIRTUAL_DEVICE_SERVICE:
++                case CROSS_DEVICE_SERVICE: // null unless the app loads com.microsoft.device-private
+                     return null;
+                 case Context.DROPBOX_SERVICE:
+                     // If the Dropbox service is missing, we don't want to trigger a WTF, because
+diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
+index 721e530..7435257 100644
+--- a/core/res/AndroidManifest.xml
++++ b/core/res/AndroidManifest.xml
+@@ -8461,6 +8461,13 @@
+     <permission android:name="android.permission.MANAGE_MEDIA_PROJECTION"
+         android:protectionLevel="signature" />
+ 
++    <!-- Link to Windows OEM integration: held by com.microsoft.deviceintegrationservice (priv-app,
++         allowlisted in privapp-permissions-ltw.xml) and the platform-signed
++         CrossDeviceServiceBroker. Same name/level OnePlus defines in oplus-framework-res.
++         @hide -->
++    <permission android:name="deviceintegration.permission.MANAGE_CROSS_DEVICE"
++        android:protectionLevel="signature|privileged" />
++
+     <!-- @hide @TestApi Allows an application to record sensitive content during media
+          projection. This is intended for on device screen recording system app.
+          @FlaggedApi("android.permission.flags.sensitive_notification_app_protection") -->
+diff --git a/services/core/Android.bp b/services/core/Android.bp
+index 7ce5d20..7ca5020 100644
+--- a/services/core/Android.bp
++++ b/services/core/Android.bp
+@@ -144,6 +144,7 @@ java_library_static {
+         ":services.core-aidl-sources",
+         ":services.core-sources",
+         ":services.core.protologsrc",
++        ":ltw-services-srcs", // Link to Windows OEM integration (vendor/ltw/rom/services)
+         ":platform-compat-config",
+         ":platform-compat-overrides",
+         ":display-device-config",
+@@ -192,6 +193,7 @@ java_library_static {
+     ],
+ 
+     static_libs: [
++        "ltw-crossdevice-aidl-server", // Link to Windows: android.app.ICrossDeviceService & co (vendor/ltw/rom/services)
+         "android.frameworks.vibrator-V1-java", // AIDL
+         "android.frameworks.devicestate-V1-java", // AIDL
+         "android.hardware.authsecret-V1.0-java",
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+index 4bb406f..4dedd1c 100644
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -1767,6 +1767,17 @@ public final class SystemServer implements Dumpable {
+             mActivityManagerService.setWindowManager(wm);
+             t.traceEnd();
+ 
++            // Link to Windows OEM integration (same place/shape as OnePlus
++            // SystemServerExtImpl.addCrossDeviceService). Never fatal.
++            t.traceBegin("StartCrossDeviceService");
++            try {
++                ServiceManager.addService("cross_device_service",
++                        new com.android.server.wm.CrossDeviceService(context));
++            } catch (Throwable e) {
++                Slog.e(TAG, "Failure starting CrossDeviceService", e);
++            }
++            t.traceEnd();
++
+             t.traceBegin("WindowManagerServiceOnInitReady");
+             wm.onInitReady();
+             t.traceEnd();
+-- 
+2.56.1.windows.1
+

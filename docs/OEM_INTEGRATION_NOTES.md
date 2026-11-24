@@ -1,7 +1,11 @@
 > **Note:** these are the working notes from the original research repository. Paths there map to this
 > repository as follows: `oem/vendor/ltw/` → `rom/`, `oem/patches/` → `rom/patches/`,
-> `oem/frameworks_base/` → `rom/frameworks_base/`, `oem/emulation/` → `module/` (the "emulation" is the
+> `oem/frameworks_base/` → `rom/services/`, `oem/emulation/` → `module/` (the "emulation" is the
 > root module). Install instructions are in the [README](../README.md).
+>
+> The patches were later regrouped by feature, call sites only: old 0001 → **0001 core**;
+> old 0002/0003/0004/0009 → **0002 black screen**; old 0005/0006/0007/0008 → **0003 Apps**
+> (0007 only touched `LtwRemoteTaskManager`, which now lives in `rom/services/`).
 
 # Link to Windows — full-feature OEM integration for AOSP / Pixel
 

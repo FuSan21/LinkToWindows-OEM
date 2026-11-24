@@ -138,8 +138,22 @@ public final class LtwRemoteTaskManager implements CrossDeviceService.RemoteTask
     }
 
     /**
-     * Hook point: called from ActivityTaskManagerService with the caller's raw options Bundle,
-     * before it is parsed into ActivityOptions.
+     * Hook point: ActivityTaskManagerService.startActivityAsUser, with the caller's raw options
+     * Bundle before it is parsed into ActivityOptions. A remote-task launch goes to its own virtual
+     * display; otherwise an app streamed in a PC window that opens another app in a new task gets
+     * its own window too ({@link #redirectAppToApp}).
+     *
+     * @param callingPackage may be null (app-to-app is then skipped).
+     * @return the Bundle to use, never throws.
+     */
+    public static Bundle redirectStartActivity(Bundle options, Intent intent, int callingUid,
+            String callingPackage) {
+        final Bundle out = redirectLaunch(options, intent, callingUid);
+        return redirectAppToApp(out, intent, callingUid, callingPackage);
+    }
+
+    /**
+     * Remote-task launch (Link to Windows "Apps"): options carrying the remote-task launch option.
      *
      * @return the Bundle to use (possibly a copy with launchDisplayId set), never throws.
      */

@@ -28,7 +28,7 @@ android {
     }
     sourceSets {
         main {
-            java.srcDirs += ["${rom}/frameworks_base/services/core/java"]
+            java.srcDirs += ["${rom}/services/java"] // shared with the ROM build (not java-platform/)
             aidl.srcDirs = ["${rom}/aidl"]
         }
     }

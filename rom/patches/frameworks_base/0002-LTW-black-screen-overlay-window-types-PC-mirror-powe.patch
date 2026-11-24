@@ -1,0 +1,133 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FuSan21 <35169687+FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 19:48:00 +0600
+Subject: [PATCH 2/3] LTW: black screen - overlay window types, PC mirror,
+ power key
+
+Link to Windows OEM integration (vendor/ltw, LtwWindowPolicy and
+LtwBlackScreenController):
+- window types 2098/2099 (drag-and-drop / black-screen overlays) allowed for
+  deviceintegrationservice and the cross-device broker (OnePlus
+  overrideCheckAddPermission), with a real layer;
+- black screen: SKIP_SCREENSHOT (also for Android 17 client-created
+  surfaces), so it stays off the PC mirror; NOT_TOUCHABLE and trusted overlay,
+  so the PC's injected input passes; seamless rotation;
+- a power press dismisses the black screen (OnePlus BlackScreenWindowManager);
+  if the broker owns it (black screen V2), the broker is asked to hide it.
+---
+ .../com/android/server/policy/PhoneWindowManager.java | 11 +++++++++++
+ .../android/server/policy/WindowManagerPolicy.java    |  4 ++++
+ .../java/com/android/server/wm/DisplayPolicy.java     |  1 +
+ .../core/java/com/android/server/wm/InputMonitor.java |  3 ++-
+ .../core/java/com/android/server/wm/WindowState.java  |  4 +++-
+ .../com/android/server/wm/WindowStateAnimator.java    |  3 ++-
+ 6 files changed, 23 insertions(+), 3 deletions(-)
+
+diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+index e17c6ae..c1b6351 100644
+--- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -3664,6 +3664,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+ 
+         outAppOp[0] = AppOpsManager.OP_NONE;
+ 
++        // Link to Windows: drag-and-drop / black-screen overlays (OnePlus overrideCheckAddPermission).
++        if (com.android.server.wm.LtwWindowPolicy.isLtwOverlay(type)) {
++            return com.android.server.wm.LtwWindowPolicy.isCrossDeviceCaller(mContext)
++                    ? ADD_OKAY : ADD_PERMISSION_DENIED;
++        }
++
+         if (!((type >= FIRST_APPLICATION_WINDOW && type <= LAST_APPLICATION_WINDOW)
+                 || (type >= FIRST_SUB_WINDOW && type <= LAST_SUB_WINDOW)
+                 || (type >= FIRST_SYSTEM_WINDOW && type <= LAST_SYSTEM_WINDOW))) {
+@@ -5037,6 +5043,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+     /** {@inheritDoc} */
+     @Override
+     public int interceptKeyBeforeQueueing(KeyEvent event, int policyFlags) {
++        // Link to Windows: a power press dismisses the black screen first.
++        if (com.android.server.wm.LtwBlackScreenController.interceptPowerKey(event,
++                (policyFlags & FLAG_INTERACTIVE) != 0)) {
++            return 0;
++        }
+         final int keyCode = event.getKeyCode();
+         final boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
+         boolean isWakeKey = (policyFlags & WindowManagerPolicy.FLAG_WAKE) != 0
+diff --git a/services/core/java/com/android/server/policy/WindowManagerPolicy.java b/services/core/java/com/android/server/policy/WindowManagerPolicy.java
+index a749751..bea7879 100644
+--- a/services/core/java/com/android/server/policy/WindowManagerPolicy.java
++++ b/services/core/java/com/android/server/policy/WindowManagerPolicy.java
+@@ -531,6 +531,10 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
+             return APPLICATION_LAYER;
+         }
+ 
++        if (com.android.server.wm.LtwWindowPolicy.isLtwOverlay(type)) {
++            return com.android.server.wm.LtwWindowPolicy.OVERLAY_LAYER; // Link to Windows
++        }
++
+         switch (type) {
+             case TYPE_WALLPAPER:
+                 // wallpaper is at the bottom, though the window manager may move it.
+diff --git a/services/core/java/com/android/server/wm/DisplayPolicy.java b/services/core/java/com/android/server/wm/DisplayPolicy.java
+index 34106a6..89dadd8 100644
+--- a/services/core/java/com/android/server/wm/DisplayPolicy.java
++++ b/services/core/java/com/android/server/wm/DisplayPolicy.java
+@@ -1024,6 +1024,7 @@ public class DisplayPolicy {
+         switch (attrs.type) {
+             case TYPE_SYSTEM_OVERLAY:
+             case TYPE_SECURE_SYSTEM_OVERLAY:
++            case LtwWindowPolicy.TYPE_BLACKSCREEN_OVERLAY: // Link to Windows: PC touches pass
+                 // These types of windows can't receive input events.
+                 attrs.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+diff --git a/services/core/java/com/android/server/wm/InputMonitor.java b/services/core/java/com/android/server/wm/InputMonitor.java
+index 9e5ec45..8271023 100644
+--- a/services/core/java/com/android/server/wm/InputMonitor.java
++++ b/services/core/java/com/android/server/wm/InputMonitor.java
+@@ -743,6 +743,7 @@ final class InputMonitor {
+                 || type == TYPE_ACCESSIBILITY_OVERLAY
+                 || type == TYPE_INPUT_CONSUMER
+                 || type == TYPE_VOICE_INTERACTION
+-                || type == TYPE_STATUS_BAR_ADDITIONAL;
++                || type == TYPE_STATUS_BAR_ADDITIONAL
++                || LtwWindowPolicy.isLtwOverlay(type); // Link to Windows (as OnePlus)
+     }
+ }
+diff --git a/services/core/java/com/android/server/wm/WindowState.java b/services/core/java/com/android/server/wm/WindowState.java
+index da4da6a..b10577e 100644
+--- a/services/core/java/com/android/server/wm/WindowState.java
++++ b/services/core/java/com/android/server/wm/WindowState.java
+@@ -1084,7 +1084,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+         mViewVisibility = viewVisibility;
+         mPolicy = mWmService.mPolicy;
+         mContext = mWmService.mContext;
+-        mForceSeamlesslyRotate = token.mRoundedCornerOverlay;
++        mForceSeamlesslyRotate = token.mRoundedCornerOverlay
++                || LtwWindowPolicy.isBlackScreen(a.type); // Link to Windows
+         mLastReportedActivityWindowInfo = mActivityRecord != null
+                 ? new ActivityWindowInfo()
+                 : null;
+@@ -3456,6 +3457,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
+         mWinAnimator.mSurfaceControl = isClientLocal()
+                 ? new SurfaceControl(surface, "setClientSurface") : surface;
+         getPendingTransaction().reparent(surface, mSurfaceControl);
++        LtwBlackScreenController.onClientSurface(this); // Link to Windows
+         mWinAnimator.resetDrawState();
+         setHasSurface(true);
+         mInputWindowHandle.forceChange();
+diff --git a/services/core/java/com/android/server/wm/WindowStateAnimator.java b/services/core/java/com/android/server/wm/WindowStateAnimator.java
+index 27df627..d6a4d45 100644
+--- a/services/core/java/com/android/server/wm/WindowStateAnimator.java
++++ b/services/core/java/com/android/server/wm/WindowStateAnimator.java
+@@ -304,7 +304,8 @@ class WindowStateAnimator {
+         int flags = SurfaceControl.HIDDEN;
+         final WindowManager.LayoutParams attrs = w.mAttrs;
+ 
+-        if ((mWin.mAttrs.privateFlags & PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0) {
++        if ((mWin.mAttrs.privateFlags & PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0
++                || LtwWindowPolicy.isBlackScreen(attrs.type)) { // Link to Windows: off the PC mirror
+             flags |= SurfaceControl.SKIP_SCREENSHOT;
+         }
+ 
+-- 
+2.56.1.windows.1
+

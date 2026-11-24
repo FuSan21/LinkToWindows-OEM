@@ -46,13 +46,13 @@ import android.widget.TextView;
  * underneath, while the PC keeps full control:
  * <ul>
  *   <li>The window is type 2099, so the framework treats it like DIS' legacy overlay: kept out of
- *       the mirror (skip-screenshot), trusted, and NOT_TOUCHABLE (patches 0002/0003).</li>
+ *       the mirror (skip-screenshot), trusted, and NOT_TOUCHABLE (patch 0002).</li>
  *   <li>A gesture monitor (spy window, MONITOR_INPUT) sees every pointer stream on the display.
  *       Streams from a physical device are pilfered, so apps get only DOWN + CANCEL; injected
  *       streams (the PC's, deviceId -1 / virtual) are left alone.</li>
  *   <li>Same UX as DIS' own overlay: a touch brings the faded content back and restarts the
  *       60 s burn-in timer; a vertical swipe over 150 px removes the black screen. The power key
- *       removes it too (system_server sends {@link #ACTION_HIDE}, patch 0009).</li>
+ *       removes it too (system_server sends {@link #ACTION_HIDE}, patch 0002 / LtwWindowPolicy).</li>
  * </ul>
  */
 final class BlackScreen {

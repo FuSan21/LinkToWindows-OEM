@@ -1,0 +1,24 @@
+// Link to Windows OEM integration: system_server side. frameworks/base patch 0001 adds both to
+// services.core, so our classes compile inside com.android.server.wm without living in
+// frameworks/base: the patches only carry the call sites.
+//
+//  java/           shared with the rooted-stock module (module/ltwemu compiles the same files)
+//  java-platform/  ROM only (uses window-manager internals)
+
+filegroup {
+    name: "ltw-services-srcs",
+    srcs: [
+        "java/**/*.java",
+        "java-platform/**/*.java",
+    ],
+    visibility: ["//frameworks/base/services/core"],
+}
+
+// system_server copy of the android.app.* cross-device AIDL (see rom/aidl/Android.bp).
+java_library_static {
+    name: "ltw-crossdevice-aidl-server",
+    srcs: [":ltw-crossdevice-aidl"],
+    platform_apis: true,
+    installable: false,
+    visibility: ["//frameworks/base/services/core"],
+}

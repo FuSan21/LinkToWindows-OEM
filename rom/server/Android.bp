@@ -1,9 +1,0 @@
-// system_server copy of the android.app.* cross-device AIDL; linked into services.core by
-// frameworks/base patch 0001.
-java_library_static {
-    name: "ltw-crossdevice-aidl-server",
-    srcs: [":ltw-crossdevice-aidl"],
-    platform_apis: true,
-    installable: false,
-    visibility: ["//frameworks/base/services/core"],
-}

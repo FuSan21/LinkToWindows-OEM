@@ -7,6 +7,8 @@ import android.os.ServiceManager;
 import android.util.Log;
 
 import com.android.server.wm.CrossDeviceService;
+import com.android.server.wm.LtwRemoteTaskManager;
+import com.android.server.wm.LtwWindowPolicy;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -19,7 +21,7 @@ import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
 
 /**
- * Rooted-stock EMULATION of what the LineageOS 24 OEM build (rom/patches/frameworks_base/0001)
+ * Rooted-stock EMULATION of what the LineageOS 24 OEM build (rom/patches/frameworks_base)
  * provides natively. It does exactly three things and nothing else:
  *
  * <ol>
@@ -45,8 +47,8 @@ public class LtwEmulationModule extends XposedModule {
     private static final String TAG = "LtwEmu";
 
     static final String SERVICE_NAME = "cross_device_service";
-    static final String BROKER_PKG = "com.microsoftsdk.crossdeviceservicebroker";
-    static final String DIS_PKG = "com.microsoft.deviceintegrationservice";
+    static final String BROKER_PKG = LtwWindowPolicy.BROKER_PACKAGE;
+    static final String DIS_PKG = LtwWindowPolicy.DIS_PACKAGE;
     private static final String MANAGER_CLASS = "android.app.CrossDeviceManager";
 
     /** signature-level on Android 17 => only a platform cert gets them on the OEM build. */
@@ -64,22 +66,13 @@ public class LtwEmulationModule extends XposedModule {
             // signature. Broker reads the UDFPS location so it never blocks fingerprint touches.
             "android.permission.USE_BIOMETRIC_INTERNAL"));
 
-    /** Broker's BlackScreen.ACTION_HIDE (power key, V2 black screen). */
-    static final String ACTION_HIDE_BLACK_SCREEN =
-            "com.microsoftsdk.crossdeviceservicebroker.action.HIDE_BLACK_SCREEN";
-
-    /** OnePlus framework window types (WindowManager.LayoutParams, oplus framework.jar). */
-    static final int TYPE_DRAGDROP_OVERLAY = 2098;
-    static final int TYPE_BLACKSCREEN_OVERLAY = 2099;
-    /** WindowManagerPolicy layer of TYPE_SECURE_SYSTEM_OVERLAY on Android 17. */
-    static final int LTW_OVERLAY_LAYER = 33;
 
     private boolean mPermHooksInstalled;
     private boolean mWindowHooksInstalled;
     private boolean mLaunchHookInstalled;
 
     /**
-     * Patch 0005 equivalent: ActivityTaskManagerService.startActivityAsUser hands the caller's raw
+     * Patch 0003 equivalent: ActivityTaskManagerService.startActivityAsUser hands the caller's raw
      * options Bundle to LtwRemoteTaskManager.redirectLaunch (Link to Windows "Apps").
      */
     private int installRemoteTaskLaunchHook(ClassLoader cl) {
@@ -103,13 +96,9 @@ public class LtwEmulationModule extends XposedModule {
                     final android.os.Bundle in = (android.os.Bundle) args[bi];
                     final android.content.Intent intent = (android.content.Intent) args[ii];
                     final int uid = android.os.Binder.getCallingUid();
-                    // == ActivityTaskManagerService.startActivityAsUser in patches 0005/0008
-                    android.os.Bundle out = com.android.server.wm.LtwRemoteTaskManager
-                            .redirectLaunch(in, intent, uid);
-                    if (pi >= 0) {
-                        out = com.android.server.wm.LtwRemoteTaskManager.redirectAppToApp(out,
-                                intent, uid, (String) args[pi]);
-                    }
+                    // == ActivityTaskManagerService.startActivityAsUser in patch 0003
+                    final android.os.Bundle out = LtwRemoteTaskManager.redirectStartActivity(in,
+                            intent, uid, pi >= 0 ? (String) args[pi] : null);
                     if (out == in) return chain.proceed();
                     args[bi] = out;
                     return chain.proceed(args);
@@ -141,7 +130,7 @@ public class LtwEmulationModule extends XposedModule {
                     final int type = findField(key.getClass(), "type").getInt(key);
                     final android.content.Intent req =
                             (android.content.Intent) findField(key.getClass(), "requestIntent").get(key);
-                    args[bi] = com.android.server.wm.LtwRemoteTaskManager
+                    args[bi] = LtwRemoteTaskManager
                             .redirectPendingIntentLaunch(in, type, req,
                                     android.os.Binder.getCallingUid());
                     return chain.proceed(args);
@@ -151,7 +140,7 @@ public class LtwEmulationModule extends XposedModule {
         } catch (Throwable t) {
             log(Log.WARN, TAG, "PendingIntentRecord.sendInner hook failed", t);
         }
-        // BAL: allow deviceintegrationservice's registered packages as the real caller (patch 0006).
+        // BAL: allow deviceintegrationservice's registered packages as the real caller (patch 0003).
         try {
             Class<?> bal = Class.forName(
                     "com.android.server.wm.BackgroundActivityStartController", false, cl);
@@ -169,8 +158,7 @@ public class LtwEmulationModule extends XposedModule {
             log(Log.INFO, TAG, "BAL_ALLOW_PERMISSION = " + allowPermission);
             hook(check).intercept(chain -> {
                 final String pkg = (String) realPkg.get(chain.getArg(0));
-                final boolean allow = com.android.server.wm.LtwRemoteTaskManager
-                        .isRealCallerBackgroundStartAllowed(pkg);
+                final boolean allow = LtwRemoteTaskManager.isRealCallerBackgroundStartAllowed(pkg);
                 log(Log.INFO, TAG, "BAL real caller " + pkg + " -> ltw allow=" + allow
                         + " (BAL_ALLOW_PERMISSION=" + allowPermission + ")");
                 if (allow) {
@@ -270,10 +258,10 @@ public class LtwEmulationModule extends XposedModule {
                     String.class, int[].class, int.class);
             hook(check).intercept(chain -> {
                 final int type = (Integer) chain.getArg(0);
-                if (type == TYPE_DRAGDROP_OVERLAY || type == TYPE_BLACKSCREEN_OVERLAY) {
+                if (LtwWindowPolicy.isLtwOverlay(type)) {
                     final Context ctx = (Context) findField(chain.getThisObject().getClass(),
                             "mContext").get(chain.getThisObject());
-                    if (isCrossDeviceCallerAllowed(ctx)) {
+                    if (LtwWindowPolicy.isCrossDeviceCaller(ctx)) {
                         ((int[]) chain.getArg(3))[0] = -1; // AppOpsManager.OP_NONE
                         return 0; // WindowManagerGlobal.ADD_OKAY
                     }
@@ -288,8 +276,8 @@ public class LtwEmulationModule extends XposedModule {
                     boolean.class, boolean.class);
             hook(layer).intercept(chain -> {
                 final int type = (Integer) chain.getArg(0);
-                if (type == TYPE_DRAGDROP_OVERLAY || type == TYPE_BLACKSCREEN_OVERLAY) {
-                    return LTW_OVERLAY_LAYER;
+                if (LtwWindowPolicy.isLtwOverlay(type)) {
+                    return LtwWindowPolicy.OVERLAY_LAYER;
                 }
                 return chain.proceed();
             });
@@ -304,7 +292,7 @@ public class LtwEmulationModule extends XposedModule {
     }
 
     /**
-     * OnePlus treats type 2099 like a rounded-corner overlay in services.jar (patch 0003):
+     * OnePlus treats type 2099 like a rounded-corner overlay in services.jar (patch 0002):
      *  - WindowStateAnimator.createSurfaceLocked: surface flag SKIP_SCREENSHOT, so SurfaceFlinger
      *    keeps the black screen out of screenshots and of the Link to Windows mirror
      *    (YourPhoneCompanion), while the phone itself shows it;
@@ -323,7 +311,7 @@ public class LtwEmulationModule extends XposedModule {
                 try {
                     Object win = winField.get(chain.getThisObject());
                     WindowManagerParams p = WindowManagerParams.of(win);
-                    if (p != null && p.type == TYPE_BLACKSCREEN_OVERLAY) {
+                    if (p != null && LtwWindowPolicy.isBlackScreen(p.type)) {
                         Object sc = scField.get(chain.getThisObject());
                         if (sc != null) setSkipScreenshot(sc);
                     }
@@ -349,7 +337,7 @@ public class LtwEmulationModule extends XposedModule {
                 Object result = chain.proceed();
                 try {
                     WindowManagerParams p = WindowManagerParams.of(chain.getThisObject());
-                    if (p != null && p.type == TYPE_BLACKSCREEN_OVERLAY) {
+                    if (p != null && LtwWindowPolicy.isBlackScreen(p.type)) {
                         Object sc = containerSc.get(chain.getThisObject());
                         if (sc != null) setSkipScreenshot(sc);
                         sBlackScreenWindow =
@@ -375,13 +363,8 @@ public class LtwEmulationModule extends XposedModule {
                     android.view.WindowManager.LayoutParams.class);
             hook(adjust).intercept(chain -> {
                 Object result = chain.proceed();
-                android.view.WindowManager.LayoutParams attrs =
-                        (android.view.WindowManager.LayoutParams) chain.getArg(1);
-                if (attrs != null && attrs.type == TYPE_BLACKSCREEN_OVERLAY) {
-                    attrs.flags |= android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                            | android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-                    attrs.flags &= ~android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
-                }
+                LtwWindowPolicy.adjustWindowParams(
+                        (android.view.WindowManager.LayoutParams) chain.getArg(1));
                 return result;
             });
             n++;
@@ -393,7 +376,7 @@ public class LtwEmulationModule extends XposedModule {
             Method trusted = im.getDeclaredMethod("isTrustedOverlay", int.class);
             hook(trusted).intercept(chain -> {
                 final int type = (Integer) chain.getArg(0);
-                if (type == TYPE_DRAGDROP_OVERLAY || type == TYPE_BLACKSCREEN_OVERLAY) {
+                if (LtwWindowPolicy.isLtwOverlay(type)) {
                     return Boolean.TRUE;
                 }
                 return chain.proceed();
@@ -412,7 +395,6 @@ public class LtwEmulationModule extends XposedModule {
     // itself; stock Android has none, so remove the window server-side (== client removeView).
 
     private static volatile java.lang.ref.WeakReference<Object> sBlackScreenWindow;
-    private volatile boolean mConsumePowerUp;
     private android.os.Handler mWmHandler;
     /** WindowManagerPolicy.FLAG_INTERACTIVE */
     private static final int POLICY_FLAG_INTERACTIVE = 0x20000000;
@@ -424,21 +406,10 @@ public class LtwEmulationModule extends XposedModule {
                     android.view.KeyEvent.class, int.class);
             hook(m).intercept(chain -> {
                 final android.view.KeyEvent ev = (android.view.KeyEvent) chain.getArg(0);
-                if (ev.getKeyCode() == android.view.KeyEvent.KEYCODE_POWER) {
-                    final int policyFlags = (Integer) chain.getArg(1);
-                    if (ev.getAction() == android.view.KeyEvent.ACTION_DOWN) {
-                        if (ev.getRepeatCount() == 0
-                                && (policyFlags & POLICY_FLAG_INTERACTIVE) != 0
-                                && dismissBlackScreen()) {
-                            mConsumePowerUp = true;
-                            return 0; // consumed: don't turn the screen off
-                        }
-                        if (mConsumePowerUp) return 0;
-                    } else if (ev.getAction() == android.view.KeyEvent.ACTION_UP
-                            && mConsumePowerUp) {
-                        mConsumePowerUp = false;
-                        return 0;
-                    }
+                final boolean interactive =
+                        ((Integer) chain.getArg(1) & POLICY_FLAG_INTERACTIVE) != 0;
+                if (LtwWindowPolicy.interceptPowerKey(ev, interactive, this::dismissBlackScreen)) {
+                    return 0; // consumed: don't turn the screen off
                 }
                 return chain.proceed();
             });
@@ -483,8 +454,7 @@ public class LtwEmulationModule extends XposedModule {
             if (attrs != null && BROKER_PKG.equals(attrs.packageName)) {
                 // V2: the broker owns the black screen (and a gesture monitor); let it hide both.
                 final Context ctx = (Context) findField(wms.getClass(), "mContext").get(wms);
-                ctx.sendBroadcastAsUser(new android.content.Intent(ACTION_HIDE_BLACK_SCREEN)
-                        .setPackage(BROKER_PKG), ownerUser(win));
+                LtwWindowPolicy.hideBrokerBlackScreen(ctx, ownerUser(win));
                 log(Log.INFO, TAG, "black screen (broker) dismissed by power key");
                 sBlackScreenWindow = null;
                 return true;
@@ -542,25 +512,6 @@ public class LtwEmulationModule extends XposedModule {
         }
     }
 
-    /**
-     * == CrossDeviceManager.isCallerAllowed, evaluated in system_server for the binder caller,
-     * plus the broker, which draws the black screen itself in DIS' "V2" mode.
-     */
-    private static boolean isCrossDeviceCallerAllowed(Context ctx) {
-        if (ctx.checkCallingPermission("deviceintegration.permission.MANAGE_CROSS_DEVICE")
-                != PackageManager.PERMISSION_GRANTED) {
-            return false;
-        }
-        final int uid = android.os.Binder.getCallingUid();
-        final long token = android.os.Binder.clearCallingIdentity();
-        try {
-            final String[] pkgs = ctx.getPackageManager().getPackagesForUid(uid);
-            return pkgs != null && (Arrays.asList(pkgs).contains(DIS_PKG)
-                    || Arrays.asList(pkgs).contains(BROKER_PKG));
-        } finally {
-            android.os.Binder.restoreCallingIdentity(token);
-        }
-    }
 
     private void registerService(Object ams) {
         if (mServiceRegistered) return;

@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FuSan21 <35169687+FuSan21@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 19:48:17 +0600
+Subject: [PATCH 3/3] LTW: Apps - remote tasks, notification launches,
+ app-to-app windows
+
+Link to Windows "Apps" (vendor/ltw LtwRemoteTaskManager, OnePlus remote
+task):
+- startActivityAsUser: a remote-task launch is redirected to its own trusted
+  virtual display; an app streamed in a PC window that opens another app in a
+  new task gets its own window;
+- PendingIntentRecord.sendInner: notifications opened from the PC carry the
+  remote-task options;
+- background-activity-start allowlist for Link to Windows as the PendingIntent
+  sender (OnePlus isFromBackgroundWhiteList).
+---
+ .../core/java/com/android/server/am/PendingIntentRecord.java | 3 +++
+ .../com/android/server/wm/ActivityTaskManagerService.java    | 3 +++
+ .../android/server/wm/BackgroundActivityStartController.java | 5 +++++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/services/core/java/com/android/server/am/PendingIntentRecord.java b/services/core/java/com/android/server/am/PendingIntentRecord.java
+index f194ee2..6806bd8 100644
+--- a/services/core/java/com/android/server/am/PendingIntentRecord.java
++++ b/services/core/java/com/android/server/am/PendingIntentRecord.java
+@@ -475,6 +475,9 @@ public final class PendingIntentRecord extends IIntentSender.Stub {
+ 
+         if (intent != null) intent.setDefusable(true);
+         if (options != null) options.setDefusable(true);
++        // Link to Windows "Apps": notifications opened from the PC carry the remote-task options.
++        options = com.android.server.wm.LtwRemoteTaskManager.redirectPendingIntentLaunch(
++                options, key.type, key.requestIntent, callingUid);
+ 
+         TempAllowListDuration duration = null;
+         Intent finalIntent = null;
+diff --git a/services/core/java/com/android/server/wm/ActivityTaskManagerService.java b/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+index e3ea345..8f5d5b3 100644
+--- a/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
++++ b/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+@@ -1315,6 +1315,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
+         mAmInternal.addCreatorToken(intent, callingPackage);
+         final int callingPid = Binder.getCallingPid();
+         final int callingUid = Binder.getCallingUid();
++        // Link to Windows "Apps": remote-task launches and app-to-app launches from a PC window.
++        bOptions = LtwRemoteTaskManager.redirectStartActivity(bOptions, intent, callingUid,
++                callingPackage);
+         final SafeActivityOptions opts = SafeActivityOptions.fromBundle(
+                 bOptions, callingPid, callingUid);
+ 
+diff --git a/services/core/java/com/android/server/wm/BackgroundActivityStartController.java b/services/core/java/com/android/server/wm/BackgroundActivityStartController.java
+index 929ce35..84fb860 100644
+--- a/services/core/java/com/android/server/wm/BackgroundActivityStartController.java
++++ b/services/core/java/com/android/server/wm/BackgroundActivityStartController.java
+@@ -1367,6 +1367,11 @@ public class BackgroundActivityStartController {
+      * or {@link #BAL_BLOCK} if the launch should be blocked
+      */
+     BalVerdict checkBackgroundActivityStartAllowedByRealCaller(BalState state) {
++        // Link to Windows "Apps" (OnePlus isFromBackgroundWhiteList): Link to Windows opens
++        // notifications as the PendingIntent sender while the notifying app is in the background.
++        if (LtwRemoteTaskManager.isRealCallerBackgroundStartAllowed(state.mRealCallingPackage)) {
++            return new BalVerdict(BAL_ALLOW_PERMISSION, "Link to Windows remote task allowlist");
++        }
+         boolean evaluateVisibleOnly =
+                 state.mCheckedOptions.getPendingIntentBackgroundActivityStartMode()
+                         == MODE_BACKGROUND_ACTIVITY_START_ALLOW_IF_VISIBLE;
+-- 
+2.56.1.windows.1
+
