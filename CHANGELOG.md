@@ -17,3 +17,5 @@ screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
 - Root module: Link to Windows no longer needs a separate APK: the installed Play version (base + split
   APKs) becomes the system copy. A missing Microsoft app never stops the install; the Action button
   finishes the setup (opens Play for Link to Windows) one step per tap.
+- Root module: the Action button reboots by itself (10 s countdown) when a setup step needs it,
+  including after Vector enabled LtwEmu; never twice for the same step.

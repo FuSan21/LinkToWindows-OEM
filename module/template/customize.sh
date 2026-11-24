@@ -36,7 +36,7 @@ fi
 ui_print "- LtwEmu (the LSPosed/Vector part) is included as a system app."
 if [ -x /data/adb/lspd/cli ]; then
     ui_print "  Vector found: LtwEmu is enabled and scoped on the next boot;"
-    ui_print "  then reboot once more. The Action button shows the status."
+    ui_print "  then tap the Action button: it reboots once more for you."
 else
     ui_print "  Enable it in LSPosed with scope 'System Framework' +"
     ui_print "  'com.microsoft.deviceintegrationservice', then reboot."

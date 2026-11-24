@@ -80,11 +80,11 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
    Microsoft apps (from that folder, or the installed copies). It never stops because one is missing.
 5. **Reboot.** If an app was missing, tap the module's **Action** button: it copies what is now
    available, or opens Play for Link to Windows / says where to put deviceintegrationservice. Tap it
-   again after each step; it tells you when to reboot. Installed copies stay installed as updates of the
+   again after each step; when a reboot is needed it counts down 10 s and reboots. Installed copies stay installed as updates of the
    system copies.
 6. Enable **LtwEmu** in LSPosed/Vector with scope **System Framework** and
    **com.microsoft.deviceintegrationservice**, then **reboot again**. With Vector (`/data/adb/lspd/cli`
-   present) the module does this itself on the first boot; you only reboot again. Manual equivalent:
+   present) the module does this itself on the first boot; then tap **Action**, which reboots for you. Manual equivalent:
    ```sh
    su -c "/data/adb/lspd/cli modules enable me.ayra.ltw.emu"
    su -c "/data/adb/lspd/cli scope set me.ayra.ltw.emu system/0 com.microsoft.deviceintegrationservice/0"

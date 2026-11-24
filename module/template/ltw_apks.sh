@@ -52,7 +52,12 @@ ltw_mark_reboot() {
     cat /proc/sys/kernel/random/boot_id > "$1/.reboot_pending" 2>/dev/null
 }
 
+# A reboot is due: APKs were copied, or Vector enabled LtwEmu, during this boot. Never true again
+# after that reboot, so a failure can't cause a reboot loop.
 ltw_reboot_pending() {
-    [ -f "$1/.reboot_pending" ] \
-        && [ "$(cat "$1/.reboot_pending")" = "$(cat /proc/sys/kernel/random/boot_id)" ]
+    boot=$(cat /proc/sys/kernel/random/boot_id)
+    for m in "$1/.reboot_pending" "$1/.ltwemu_enabled"; do
+        [ -f "$m" ] && [ "$(cat "$m")" = "$boot" ] && return 0
+    done
+    return 1
 }

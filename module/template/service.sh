@@ -22,12 +22,12 @@ dis_domain_rule() {
 }
 
 # Vector: enable LtwEmu (shipped as a system app) and set its scope once. Hooks load on the next
-# boot; action.sh reports it.
+# boot; the marker holds this boot's id, so action.sh knows a reboot is due.
 enable_ltwemu() {
     [ -x "$LSPD_CLI" ] && [ ! -f "$MODDIR/.ltwemu_enabled" ] || return 0
     "$LSPD_CLI" modules enable "$EMU" \
         && "$LSPD_CLI" scope set "$EMU" system/0 "$DIS/0" \
-        && touch "$MODDIR/.ltwemu_enabled" \
+        && cat /proc/sys/kernel/random/boot_id > "$MODDIR/.ltwemu_enabled" \
         && log -t ltw_module "LtwEmu enabled in Vector; reboot once more"
 }
 

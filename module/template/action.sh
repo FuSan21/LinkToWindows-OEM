@@ -14,6 +14,15 @@ ok()  { echo "[ OK ] $*"; }
 bad() { echo "[FAIL] $*"; FAIL=1; }
 todo() { echo "[TODO] $*"; TODO=1; }
 
+countdown_reboot() {
+    echo
+    for i in 10 9 8 7 6 5 4 3 2 1; do
+        echo "Rebooting in $i s..."
+        sleep 1
+    done
+    svc power reboot 2>/dev/null || reboot
+}
+
 version() {
     dumpsys package "$1" 2>/dev/null | sed -n 's/^ *versionName=//p' | head -1
 }
@@ -49,7 +58,9 @@ if [ $TODO = 1 ]; then
 fi
 if ltw_reboot_pending "$MODDIR"; then
     echo
-    echo "Setup done. Reboot now, then tap Action again to check everything."
+    echo "Setup step done; it takes effect after a reboot. Tap Action again afterwards"
+    echo "to continue or to check everything."
+    countdown_reboot
     exit 0
 fi
 
@@ -75,7 +86,6 @@ else
     bad "cross_device_service not found: LtwEmu is not active"
     if [ -x /data/adb/lspd/cli ]; then
         echo "       Vector: $(/data/adb/lspd/cli modules ls 2>/dev/null | grep "$EMU" || echo "$EMU not listed")"
-        [ -f "$MODDIR/.ltwemu_enabled" ] && echo "       LtwEmu was enabled automatically: reboot once more."
     else
         echo "       Enable LtwEmu in LSPosed (scope: System Framework + $DIS) and reboot."
     fi
