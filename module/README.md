@@ -15,16 +15,26 @@ a few system_server hooks.
 | deviceintegrationservice priv-app | `/system/priv-app/DeviceIntegrationService` | your APK (copied by `customize.sh`) |
 | Link to Windows priv-app | `/system/priv-app/LinktoWindows`; Play version installs as its update | your APK |
 | privapp allowlist / hidden-API sysconfig / default grants | same XMLs in `/system/etc` | `template/system/etc` |
-| `cross_device_service` in SystemServer (patch 0001) | `ltwemu` hook after `ActivityManagerService.systemReady`, **same `CrossDeviceService` source** | `ltwemu/` + `rom/frameworks_base` |
+| `cross_device_service` in SystemServer (patch 0001) | `ltwemu` hook after `ActivityManagerService.systemReady`, **same `CrossDeviceService` source** | `ltwemu/` + `rom/services/java` |
 | `getSystemService("cross_device_service")` fetcher (0001) | `ltwemu` hook on `SystemServiceRegistry.getSystemService` in deviceintegrationservice | `ltwemu/` |
 | broker's platform signature | `ltwemu` grants the broker **only** `MANAGE_MEDIA_PROJECTION`, `READ_CLIPBOARD_IN_BACKGROUND`, `ACCESS_DEVICE_INTEGRATION`, `MONITOR_INPUT`, `USE_BIOMETRIC_INTERNAL` | `ltwemu/` |
-| window types 2098/2099 (0002, 0009) | hook on `PhoneWindowManager.checkAddPermission` (deviceintegrationservice + broker) | `ltwemu/` |
-| black screen off the mirror, not touchable, trusted (0003) | hooks on `WindowState.setClientSurface`, `DisplayPolicy.adjustWindowParamsLw`, `InputMonitor.isTrustedOverlay` | `ltwemu/` |
-| power key dismisses the black screen (0004, 0009) | hook on `PhoneWindowManager.interceptKeyBeforeQueueing` | `ltwemu/` |
-| Apps / Remote Task (0005, 0008) | hook on `ActivityTaskManagerService.startActivityAsUser` → **same `LtwRemoteTaskManager` source** | `ltwemu/` + `rom/frameworks_base` |
-| Apps: notifications, background-start allowlist, phone switch (0006) | hooks on `PendingIntentRecord.sendInner` and `BackgroundActivityStartController.checkBackgroundActivityStartAllowedByRealCaller` (+ `deoptimize` of its caller) | `ltwemu/` |
+| window types 2098/2099 (0002) | hook on `PhoneWindowManager.checkAddPermission` → **same `LtwWindowPolicy`** (deviceintegrationservice + broker) | `ltwemu/` + `rom/services/java` |
+| black screen off the mirror, not touchable, trusted (0002) | hooks on `WindowState.setClientSurface`, `DisplayPolicy.adjustWindowParamsLw`, `InputMonitor.isTrustedOverlay` | `ltwemu/` |
+| power key dismisses the black screen (0002) | hook on `PhoneWindowManager.interceptKeyBeforeQueueing` | `ltwemu/` |
+| Apps / Remote Task (0003) | hook on `ActivityTaskManagerService.startActivityAsUser` → **same `LtwRemoteTaskManager` source** | `ltwemu/` + `rom/services/java` |
+| Apps: notifications, background-start allowlist, phone switch (0003) | hooks on `PendingIntentRecord.sendInner` and `BackgroundActivityStartController.checkBackgroundActivityStartAllowedByRealCaller` (+ `deoptimize` of its caller) | `ltwemu/` |
 | `cross_device_service` sepolicy type | `sepolicy.rule`: `default_android_service` add/find (incl. `priv_app_36`) | `template/` |
 | `vendor.virtual_keyboard` init service | same binary (NDK build), started by `service.sh` as root with deviceintegrationservice's UID | `virtual_keyboard/build.sh` ← `rom/virtual_keyboard` |
+
+## Module files
+
+| File | When | What |
+|---|---|---|
+| `customize.sh` | install | Copies the Microsoft APKs from `/sdcard/Download/LinkToWindowsOEM/`, else from the installed module (updates) |
+| `service.sh` | every boot | SELinux rule for deviceintegrationservice's `priv_app_<targetSdk>`; enables LtwEmu in Vector once; runs `vendor.virtual_keyboard` |
+| `action.sh` | Action button | Health check |
+| `system/app/LtwEmu` | — | The LSPosed/Vector module, shipped as a system app |
+| `module.prop` `updateJson` | — | In-app updates from the latest GitHub release |
 
 ## Black screen
 

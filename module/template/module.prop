@@ -3,4 +3,5 @@ name=Link to Windows OEM integration
 version=dev
 versionCode=1
 author=FuSan21
-description=Native Link to Windows (phone screen, Apps, black screen, PC keyboard) on rooted stock Android 17, the way an OEM ships it. Needs the LtwEmu LSPosed/Vector module; on KernelSU also a metamodule (Mountify / meta-overlayfs).
+description=Native Link to Windows (phone screen, Apps, black screen, PC keyboard) on rooted stock Android 17, the way an OEM ships it. Includes the LtwEmu LSPosed/Vector module; on KernelSU also needs a metamodule (Mountify / meta-overlayfs). Action button = health check.
+updateJson=https://github.com/FuSan21/LinkToWindows-OEM/releases/latest/download/update.json

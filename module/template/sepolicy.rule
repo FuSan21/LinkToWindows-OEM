@@ -1,6 +1,7 @@
 # cross_device_service has no service_contexts entry on stock, so servicemanager labels it
 # default_android_service. The Lineage build gives it a proper type (vendor/ltw/sepolicy).
-# Android 17 runs priv-apps in per-targetSdk domains (deviceintegrationservice: priv_app_36).
+# Android 17 runs priv-apps in per-targetSdk domains (deviceintegrationservice: priv_app_36;
+# service.sh adds the rule for another targetSdk at boot).
 allow system_server default_android_service service_manager { add find }
 allow priv_app default_android_service service_manager find
 allow priv_app_36 default_android_service service_manager find

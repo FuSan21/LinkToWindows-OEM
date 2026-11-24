@@ -7,7 +7,7 @@
 #   customize.sh then copies them from /sdcard/Download/LinkToWindowsOEM/ when the module is
 #   installed. With both arguments they are bundled into the zip (personal builds).
 #
-# Prereq: ./gradlew :device-private:deviceprivateJar :broker:assembleRelease
+# Prereq: ./gradlew :device-private:deviceprivateJar :broker:assembleRelease :ltwemu:assembleRelease
 #         module/virtual_keyboard/build.sh
 set -euo pipefail
 DIS_APK="${1:-}"
@@ -29,11 +29,14 @@ sed -i "s/^version=.*/version=$VERSION/; s/^versionCode=.*/versionCode=$VERSION_
     "$STAGE/module.prop"
 mkdir -p "$STAGE/system/framework" \
          "$STAGE/system/priv-app/CrossDeviceServiceBroker" \
+         "$STAGE/system/app/LtwEmu" \
          "$STAGE/bin"
 cp "$MOD/device-private/build/ltw/com.microsoft.device-private.jar" "$STAGE/system/framework/"
 cp "$MOD/virtual_keyboard/build/ltw_virtual_keyboard" "$STAGE/bin/"
 cp "$MOD"/broker/build/outputs/apk/release/*.apk \
    "$STAGE/system/priv-app/CrossDeviceServiceBroker/CrossDeviceServiceBroker.apk"
+# The LSPosed/Vector module ships as a system app: one zip to install.
+cp "$MOD"/ltwemu/build/outputs/apk/release/*.apk "$STAGE/system/app/LtwEmu/LtwEmu.apk"
 if [ -n "$DIS_APK" ]; then
     mkdir -p "$STAGE/system/priv-app/DeviceIntegrationService" "$STAGE/system/priv-app/LinktoWindows"
     cp "$DIS_APK" "$STAGE/system/priv-app/DeviceIntegrationService/DeviceIntegrationService.apk"
