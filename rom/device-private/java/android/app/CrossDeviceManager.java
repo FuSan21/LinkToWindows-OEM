@@ -85,10 +85,19 @@ public class CrossDeviceManager {
         }
     }
 
-    private static ICrossDeviceService requireService() throws RemoteException {
+    private static boolean sMissingLogged;
+
+    /**
+     * The service, or null if it is not there (yet): the root module registers it only from the
+     * boot after LtwEmu is enabled, and it can be absent if LtwEmu fails to load. Callers then
+     * behave like a device without the feature instead of crashing deviceintegrationservice
+     * (which calls getThermalStatus while starting up).
+     */
+    private static ICrossDeviceService service() {
         ICrossDeviceService s = getService();
-        if (s == null) {
-            throw new RemoteException(SERVICE_NAME + " is not available");
+        if (s == null && !sMissingLogged) {
+            sMissingLogged = true;
+            Log.w(TAG, SERVICE_NAME + " is not available; cross-device calls do nothing");
         }
         return s;
     }
@@ -157,80 +166,100 @@ public class CrossDeviceManager {
     // ---------------------------------------------------------------- binder-backed
 
     public void injectInputEvent(InputEvent event, int mode) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().injectInputEvent(event, mode);
+            s.injectInputEvent(event, mode);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public String getTopRunningPackageName() {
+        final ICrossDeviceService s = service();
+        if (s == null) return null;
         try {
-            return requireService().getTopRunningPackageName();
+            return s.getTopRunningPackageName();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void wakeUp(long time) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().wakeUp(time);
+            s.wakeUp(time);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void addRemoteTaskCallback(IRemoteTaskCallback callback) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().addRemoteTaskCallback(callback);
+            s.addRemoteTaskCallback(callback);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void removeRemoteTaskCallback(IRemoteTaskCallback callback) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().removeRemoteTaskCallback(callback);
+            s.removeRemoteTaskCallback(callback);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void updateBackgroundActivityList(List<String> activityList) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().updateBackgroundActivityList(activityList);
+            s.updateBackgroundActivityList(activityList);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void updateSurface(String uuid, Surface surface) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().updateSurface(uuid, surface);
+            s.updateSurface(uuid, surface);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void setDisplayInfo(int width, int height, int densityDpi) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().updateDisplayInfo(width, height, densityDpi);
+            s.updateDisplayInfo(width, height, densityDpi);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public int getThermalStatus() {
+        final ICrossDeviceService s = service();
+        if (s == null) return 0;
         try {
-            return requireService().getThermalStatus();
+            return s.getThermalStatus();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public boolean isResumableFromOverheat() {
+        final ICrossDeviceService s = service();
+        if (s == null) return true;
         try {
-            return requireService().isResumableFromOverheat();
+            return s.isResumableFromOverheat();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -239,8 +268,10 @@ public class CrossDeviceManager {
     /** Newer DIS API (not on OnePlus A15). Missing key => DIS treats temperature as unknown. */
     public Bundle getDeviceTemperature() {
         Bundle b = new Bundle();
+        final ICrossDeviceService s = service();
+        if (s == null) return b; // temperature unknown
         try {
-            float t = requireService().getDeviceTemperature();
+            float t = s.getDeviceTemperature();
             if (!Float.isNaN(t)) {
                 b.putFloat(KEY_DEVICE_TEMPERATURE, t);
             }
@@ -263,64 +294,80 @@ public class CrossDeviceManager {
     }
 
     public IRfcommOemManager getRfcommOemManager() {
+        final ICrossDeviceService s = service();
+        if (s == null) return null;
         try {
-            return requireService().getRfcommOemManager();
+            return s.getRfcommOemManager();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void setPermissionGranted(int uid) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().setPermissionGranted(uid);
+            s.setPermissionGranted(uid);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public boolean getPermissionGranted(int uid) {
+        final ICrossDeviceService s = service();
+        if (s == null) return false;
         try {
-            return requireService().getPermissionGranted(uid);
+            return s.getPermissionGranted(uid);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void setSecurityToken(String securityToken) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().setSecurityToken(securityToken);
+            s.setSecurityToken(securityToken);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void registerTaskChangeListener(ITaskChangeListener listener) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().registerTaskChangeListener(listener);
+            s.registerTaskChangeListener(listener);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public void unregisterTaskChangeListener(ITaskChangeListener listener) {
+        final ICrossDeviceService s = service();
+        if (s == null) return;
         try {
-            requireService().unregisterTaskChangeListener(listener);
+            s.unregisterTaskChangeListener(listener);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public IProximityService getProximityService() {
+        final ICrossDeviceService s = service();
+        if (s == null) return null;
         try {
-            return requireService().getProximityService();
+            return s.getProximityService();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     public boolean isInstantHotspotCapable() {
+        final ICrossDeviceService s = service();
+        if (s == null) return false;
         try {
-            return requireService().isInstantHotspotCapable();
+            return s.isInstantHotspotCapable();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
