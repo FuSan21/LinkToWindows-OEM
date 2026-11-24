@@ -13,7 +13,7 @@ There are two ways to use it. Both build from the **same Java/AIDL/C++ sources**
 | | **A. Root module** (`module/`) | **B. Custom ROM** (`rom/`) |
 |---|---|---|
 | For | Rooted **stock** Android 17 | People who build their own ROM (LineageOS 24 / Android 17) |
-| How | KernelSU/Magisk module + LSPosed/Vector module | `vendor/ltw` drop-in + `frameworks/base` patches, platform-signed |
+| How | One KernelSU/Magisk module (includes the LSPosed/Vector part) | `vendor/ltw` drop-in + `frameworks/base` patches, platform-signed |
 | Install | Download the release, flash | `repo sync` one extra project, apply patches, build |
 | Status | ✅ **Validated** on a Pixel 7a (lynx), stock Android 17 | ⚠️ Patches apply cleanly to `lineage-24.0`; **not yet built/booted** |
 
@@ -70,9 +70,8 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
 
 ### Install
 
-1. Download from the [latest release](../../releases/latest):
-   - `ltw_oem_module-<version>.zip` (the KernelSU/Magisk module)
-   - `LtwEmu-<version>.apk` (the LSPosed/Vector module)
+1. Download `ltw_oem_module-<version>.zip` from the [latest release](../../releases/latest). It includes
+   LtwEmu, the LSPosed/Vector part, as a system app.
 2. On the phone, create `/sdcard/Download/LinkToWindowsOEM/` and copy both Microsoft APKs into it,
    named exactly `DeviceIntegrationService.apk` and `LinktoWindows.apk`.
 3. Remove conflicting copies:
@@ -83,17 +82,21 @@ On the PC: Windows 10/11 with the **Phone Link** app, signed in to the same Micr
    - **Keep** Link to Windows from Play installed. It becomes an update of the system copy.
 4. Install `ltw_oem_module-<version>.zip` in the KernelSU/Magisk manager. The installer copies the two APKs
    from step 2 into the module and aborts with a clear message if one is missing.
-5. Install `LtwEmu-<version>.apk` as a normal app. In LSPosed/Vector, **enable** it and set its scope to
-   **System Framework** and **com.microsoft.deviceintegrationservice**. Or via shell:
+5. **Reboot.**
+6. Enable **LtwEmu** in LSPosed/Vector with scope **System Framework** and
+   **com.microsoft.deviceintegrationservice**, then **reboot again**. With Vector (`/data/adb/lspd/cli`
+   present) the module does this itself on the first boot; you only reboot again. Manual equivalent:
    ```sh
    su -c "/data/adb/lspd/cli modules enable me.ayra.ltw.emu"
    su -c "/data/adb/lspd/cli scope set me.ayra.ltw.emu system/0 com.microsoft.deviceintegrationservice/0"
    ```
-6. **Reboot.**
 7. Open Link to Windows, sign in, pair with Phone Link on the PC, and allow the permissions it asks for.
 8. On the PC open Phone Link → **Apps** / **Open phone screen**. The first time, accept the prompt on the phone.
 
 ### Check that it is active
+
+Tap the module's **Action** button in KernelSU/Magisk. It checks every piece (priv-apps, broker,
+`cross_device_service`, LtwEmu, keyboard daemon, SELinux domain) and says what to fix. By hand:
 
 ```sh
 adb shell su -c "service check cross_device_service"     # must say: found   (run as root)
@@ -112,9 +115,11 @@ or Magisk safe mode, then remove the module. Report the DIS/Link to Windows vers
 
 ### Update / uninstall
 
-- Update: install the new module zip over the old one (APKs in `/sdcard/Download/LinkToWindowsOEM/` are
-  needed again), update `LtwEmu.apk`, reboot.
-- Uninstall: remove the module in the manager, uninstall `LtwEmu`, reboot.
+- Update: KernelSU/Magisk show module updates (`updateJson`); or install the new zip over the old one. The
+  installer reuses the Microsoft APKs from the installed module, unless newer ones are in
+  `/sdcard/Download/LinkToWindowsOEM/`. Reboot.
+- Uninstall: remove the module in the manager, reboot. (If you installed `LtwEmu` as a normal app with
+  v1.0.0, uninstall that too.)
 
 ### Build it yourself
 
@@ -128,9 +133,8 @@ module/build-module.sh                      # zip without Microsoft APKs (like t
 # or bundle them:  module/build-module.sh DeviceIntegrationService.apk LinktoWindows.apk
 ```
 
-Outputs: `module/build/ltw_oem_module-*.zip` and
-`module/ltwemu/build/outputs/apk/release/ltwemu-release.apk`. Without signing variables the APKs use your
-Android debug key (see [Releases](#releases-maintainers)).
+Output: `module/build/ltw_oem_module-*.zip` (LtwEmu included). Without signing variables the APKs use
+your Android debug key (see [Releases](#releases-maintainers)).
 
 What each piece does is described in [`module/README.md`](module/README.md).
 
@@ -170,7 +174,8 @@ cp /path/to/DeviceIntegrationService.apk vendor/ltw/rom/prebuilt/DeviceIntegrati
 cp /path/to/LinktoWindows.apk            vendor/ltw/rom/prebuilt/LinktoWindows/
 ```
 
-(`*.apk` is git-ignored, so they never get committed.)
+(`*.apk` is git-ignored, so they never get committed. Without them the build stops with a message saying
+which one is missing.)
 
 ### 3. Apply the framework patches
 
@@ -179,8 +184,10 @@ vendor/ltw/rom/apply-patches.sh --check   # dry run
 vendor/ltw/rom/apply-patches.sh           # git am onto frameworks/base
 ```
 
-The script skips patches that are already applied. **Run it again after every `repo sync`**, since a sync can
-reset `frameworks/base`.
+There are three patches, one per feature (core, black screen, Apps), carrying only the call sites. The
+code lives in `vendor/ltw/rom/services`. The script skips patches that are already applied. **Run it
+again after every `repo sync`**, since a sync can reset `frameworks/base`. CI checks every week that they
+still apply to the latest `lineage-24.0`.
 
 ### 4. Hook it into the build
 
@@ -226,7 +233,7 @@ File-by-file reference: [`rom/README.md`](rom/README.md).
 
 ## How it works (short)
 
-- **`cross_device_service`** (system_server, `rom/frameworks_base/.../CrossDeviceService.java`):
+- **`cross_device_service`** (system_server, `rom/services/java/.../CrossDeviceService.java`):
   the OEM binder that deviceintegrationservice talks to (`android.app.ICrossDeviceService`, transaction codes
   identical to OnePlus). It handles input injection, wake, thermal readings, task-change events and
   "Apps" (Remote Task).
@@ -242,8 +249,8 @@ File-by-file reference: [`rom/README.md`](rom/README.md).
   display, which deviceintegrationservice encodes to its own PC window.
 - **`vendor.virtual_keyboard`** (`rom/virtual_keyboard`): a uinput keyboard daemon for PC typing.
 - The **root module** supplies the same pieces with files (priv-apps, permissions, sysconfig) plus
-  LSPosed hooks in system_server that do what the `frameworks/base` patches do, compiled from the **same
-  source files**.
+  LSPosed hooks in system_server at the same call sites the `frameworks/base` patches use, calling the
+  **same classes** (`rom/services/java`).
 
 The full reverse-engineering notes, the OnePlus reference and the test log are in
 [`docs/OEM_INTEGRATION_NOTES.md`](docs/OEM_INTEGRATION_NOTES.md).
@@ -255,13 +262,12 @@ rom/                          custom-ROM drop-in (cloned to vendor/ltw, used as 
   ltw.mk, BoardConfigLtw.mk   product + board hooks
   aidl/                       android.app.ICrossDeviceService & co (OnePlus-compatible codes)
   device-private/             com.microsoft.device-private (CrossDeviceManager)
-  server/                     system_server copy of the AIDL
   broker/                     CrossDeviceServiceBroker (platform-signed): projection, clipboard, black screen
   virtual_keyboard/           vendor.virtual_keyboard uinput daemon (C++)
   permissions/, sepolicy/     privapp allowlist, default grants, hidden-API sysconfig, SELinux
   prebuilt/                   put the two Microsoft APKs here
-  frameworks_base/            canonical CrossDeviceService / LtwRemoteTaskManager (also used by module/)
-  patches/frameworks_base/    0001-0009, apply with apply-patches.sh
+  services/                   our system_server classes, compiled into services.core (java/ also by module/)
+  patches/frameworks_base/    0001 core, 0002 black screen, 0003 Apps: call sites only (apply-patches.sh)
   local_manifest.xml          repo local manifest
 module/                       root-module path (Gradle + scripts)
   ltwemu/                     LSPosed/Vector module = the frameworks/base patches as hooks
@@ -275,8 +281,11 @@ docs/                         reverse-engineering notes
 
 ## Releases (maintainers)
 
-`.github/workflows/build.yml` builds everything on every push. Pushing a tag `v*` publishes a GitHub
-release with `ltw_oem_module-<tag>.zip` and `LtwEmu-<tag>.apk`. Microsoft APKs are never included.
+`.github/workflows/build.yml` runs shellcheck, checks that the patches apply to the latest
+`lineage-24.0` (also weekly), and builds the module on every push. Pushing a tag `v*` publishes a GitHub
+release with `ltw_oem_module-<tag>.zip`, `update.json` (KernelSU/Magisk in-app updates) and
+`SHA256SUMS`. Microsoft APKs are never included. Add the release's changes to `CHANGELOG.md` first: the
+module manager shows it.
 
 So that updates install over each other, sign with a fixed key. Add these repository secrets:
 
