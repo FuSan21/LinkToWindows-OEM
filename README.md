@@ -118,8 +118,8 @@ or Magisk safe mode, then remove the module. Report the DIS/Link to Windows vers
 - Update: KernelSU/Magisk show module updates (`updateJson`); or install the new zip over the old one. The
   installer reuses the Microsoft APKs from the installed module, unless newer ones are in
   `/sdcard/Download/LinkToWindowsOEM/`. Reboot.
-- Uninstall: remove the module in the manager, reboot. (If you installed `LtwEmu` as a normal app with
-  v1.0.0, uninstall that too.)
+- Uninstall: remove the module in the manager, reboot. (If you ever installed `LtwEmu` as a normal app,
+  uninstall that too.)
 
 ### Build it yourself
 

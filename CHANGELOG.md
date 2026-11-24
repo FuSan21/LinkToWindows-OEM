@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v1.0.0
+
+First release: root module for stock Android 17 and LineageOS 24 drop-in. Phone screen, Apps, black
+screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
 
 - Root module: LtwEmu (the LSPosed/Vector part) is included in the module zip; with Vector it is enabled
   and scoped automatically. One zip to install.
@@ -11,8 +14,3 @@
   `rom/services` and is shared with the root module (`LtwWindowPolicy`).
 - ROM: clear build error when a Microsoft APK is missing.
 - CI: shellcheck, weekly check that the patches apply to `lineage-24.0`, `SHA256SUMS`, pinned actions.
-
-## v1.0.0
-
-First release: root module for stock Android 17 and LineageOS 24 drop-in. Phone screen, Apps, black
-screen (phone touches blocked), PC keyboard, clipboard, audio, drag & drop.
