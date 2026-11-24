@@ -25,6 +25,11 @@ dis_domain_rule() {
 # boot; the marker holds this boot's id, so action.sh knows a reboot is due.
 enable_ltwemu() {
     [ -x "$LSPD_CLI" ] && [ ! -f "$MODDIR/.ltwemu_enabled" ] || return 0
+    # Already enabled (e.g. after a module update): nothing takes effect later, no reboot is due.
+    if "$LSPD_CLI" modules ls 2>/dev/null | grep "$EMU" | grep -q enabled; then
+        echo already > "$MODDIR/.ltwemu_enabled"
+        return 0
+    fi
     "$LSPD_CLI" modules enable "$EMU" \
         && "$LSPD_CLI" scope set "$EMU" system/0 "$DIS/0" \
         && cat /proc/sys/kernel/random/boot_id > "$MODDIR/.ltwemu_enabled" \

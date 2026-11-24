@@ -9,6 +9,7 @@ EMU=me.ayra.ltw.emu
 FAIL=0
 
 . "$MODDIR/ltw_apks.sh"
+LTW_CHECKER=$MODDIR/system/app/LtwEmu/LtwEmu.apk
 
 ok()  { echo "[ OK ] $*"; }
 bad() { echo "[FAIL] $*"; FAIL=1; }
@@ -33,24 +34,37 @@ echo
 # ---- setup: Microsoft's APKs ----
 TODO=0
 COPIED=0
+DIS_URL=https://www.apkmirror.com/apk/microsoft-corporation/device-integration-service/
+OPENED=
+open_url() {
+    [ -z "$OPENED" ] || return 0   # one page per tap
+    OPENED=1
+    am start -a android.intent.action.VIEW -d "$1" >/dev/null 2>&1         || { [ -n "$2" ] && am start -a android.intent.action.VIEW -d "$2" >/dev/null 2>&1; }
+}
 setup() {
-    name=$1 pkg=$2
-    ltw_provide "$MODDIR/system/priv-app/$name" "$name" "$pkg" || return 1
+    name=$1 pkg=$2 pattern=$3
+    LTW_REJECTED=
+    ltw_provide "$MODDIR/system/priv-app/$name" "$name" "$pkg" "" "$pattern"
+    rc=$?
+    for f in $LTW_REJECTED; do
+        echo "[WARN] $f is not Microsoft's $pkg (signature check failed), ignored."
+    done
+    [ $rc = 0 ] || return 1
     if [ -n "$LTW_FROM" ]; then
         echo "[ NEW] $name: copied from $LTW_FROM"
         COPIED=1
     fi
     return 0
 }
-if ! setup DeviceIntegrationService "$DIS"; then
-    todo "deviceintegrationservice is missing (it is not on Play). Copy"
-    echo "       DeviceIntegrationService.apk to $LTW_SRC/, then tap Action again."
+if ! setup DeviceIntegrationService "$DIS" 'device.*integration.*service'; then
+    todo "Download Device Integration Service (APK file, not the bundle) to Download/;"
+    echo "       its download page is opening now. Then tap Action again: the APK is"
+    echo "       found there and checked for Microsoft's certificate."
+    open_url "$DIS_URL"
 fi
 if ! setup LinktoWindows "$LTW"; then
-    todo "Install Link to Windows from Play (opening its page now), then tap Action again."
-    am start -a android.intent.action.VIEW -d "market://details?id=$LTW" >/dev/null 2>&1 \
-        || am start -a android.intent.action.VIEW \
-            -d "https://play.google.com/store/apps/details?id=$LTW" >/dev/null 2>&1
+    todo "Install Link to Windows from Play, then tap Action again."
+    open_url "market://details?id=$LTW" "https://play.google.com/store/apps/details?id=$LTW"
 fi
 [ $COPIED = 1 ] && ltw_mark_reboot "$MODDIR"
 if [ $TODO = 1 ]; then
@@ -64,6 +78,13 @@ if ltw_reboot_pending "$MODDIR"; then
     exit 0
 fi
 
+MISSING_REQ=$(ltw_missing_requirements)
+if [ -n "$MISSING_REQ" ]; then
+    echo "$MISSING_REQ" | while read -r line; do bad "missing: $line"; done
+    FAIL=1
+else
+    ok "metamodule, Zygisk and Vector/LSPosed present"
+fi
 if dumpsys package "$DIS" 2>/dev/null | grep -q "codePath=/system/priv-app/DeviceIntegrationService"; then
     ok "deviceintegrationservice $(version "$DIS") is a priv-app"
 else
