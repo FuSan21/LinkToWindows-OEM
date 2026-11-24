@@ -1,3 +1,41 @@
 plugins {
     id 'com.android.application' version '9.5.2' apply false
 }
+
+// Settings shared by the module's Android projects (:broker, :device-private, :ltwemu).
+// They are pure-Java system components that compile against hidden APIs via :stubs.
+subprojects {
+    plugins.withId('com.android.application') {
+        android {
+            compileSdk = 36
+            defaultConfig {
+                minSdk = 32
+                targetSdk = 36
+                versionCode = (System.getenv('LTW_VERSION_CODE') ?: '1') as int
+                versionName = System.getenv('LTW_VERSION') ?: 'dev'
+            }
+            buildTypes {
+                release {
+                    minifyEnabled = false
+                }
+            }
+            buildFeatures {
+                aidl = true
+                buildConfig = false
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+        dependencies {
+            compileOnly project(':stubs')
+        }
+        // AGP 9 adds kotlin-stdlib implicitly; keep it out of what gets packaged (only the runtime
+        // classpaths; lint still needs its own Kotlin).
+        configurations.matching { it.name.endsWith('RuntimeClasspath') }.configureEach {
+            exclude group: 'org.jetbrains.kotlin'
+            exclude group: 'org.jetbrains'
+        }
+    }
+}

@@ -4,44 +4,27 @@ plugins {
     id 'com.android.application'
 }
 
-def ltw = "${rootDir}/rom"
-
 android {
     namespace = 'me.ayra.ltw.devicepriv'
-    compileSdk = 36
-
     defaultConfig {
         applicationId = 'me.ayra.ltw.devicepriv.buildonly'
-        minSdk = 32
-        targetSdk = 36
         versionCode = 1
         versionName = '1.0'
     }
     buildTypes {
         release {
-            minifyEnabled = false
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.debug // build-only APK; only its dex is shipped
         }
     }
     buildFeatures {
-        aidl = true
-        buildConfig = false
         resValues = false
     }
     sourceSets {
         main {
-            java.srcDirs = ["${ltw}/device-private/java"]
-            aidl.srcDirs = ["${ltw}/aidl"]
+            java.srcDirs = ["${rootDir}/rom/device-private/java"]
+            aidl.srcDirs = ["${rootDir}/rom/aidl"]
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-dependencies {
-    compileOnly project(':stubs')
 }
 
 // apk -> jar containing only classes*.dex (resolved at execution time)
@@ -61,11 +44,4 @@ tasks.register('deviceprivateJar') {
         }
         println "device-private jar: ${out}"
     }
-}
-
-// AGP 9 adds kotlin-stdlib implicitly; these are pure-Java system components, so keep it out of
-// what gets packaged (only the runtime classpaths; lint still needs its own Kotlin).
-configurations.matching { it.name.endsWith('RuntimeClasspath') }.configureEach {
-    exclude group: 'org.jetbrains.kotlin'
-    exclude group: 'org.jetbrains'
 }

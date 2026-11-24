@@ -1,52 +1,20 @@
-// EMULATION build of the Lineage broker (rom/broker) for rooted stock Android 17.
-// Same Java + AIDL; manifest differs only by defining MANAGE_CROSS_DEVICE (see manifest).
+// Rooted-stock build of the ROM broker (rom/broker): same Java + AIDL; the manifest differs only by
+// defining MANAGE_CROSS_DEVICE (see manifest). Shared settings: root build.gradle.
 plugins {
     id 'com.android.application'
 }
 
-def ltw = "${rootDir}/rom"
-
 android {
     namespace = 'com.microsoftsdk.crossdeviceservicebroker'
-    compileSdk = 36
-
     defaultConfig {
         applicationId = 'com.microsoftsdk.crossdeviceservicebroker'
-        minSdk = 32
-        targetSdk = 36
-        versionCode = (System.getenv('LTW_VERSION_CODE') ?: '1') as int
-        versionName = System.getenv('LTW_VERSION') ?: 'dev'
-    }
-    buildTypes {
-        release {
-            minifyEnabled = false
-        }
-    }
-    buildFeatures {
-        aidl = true
-        buildConfig = false
     }
     sourceSets {
         main {
-            java.srcDirs = ["${ltw}/broker/src"]
-            aidl.srcDirs = ["${ltw}/broker/aidl"]
+            java.srcDirs = ["${rootDir}/rom/broker/src"]
+            aidl.srcDirs = ["${rootDir}/rom/broker/aidl"]
         }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
 apply from: "${rootDir}/module/signing.gradle"
-
-dependencies {
-    compileOnly project(':stubs')
-}
-
-// AGP 9 adds kotlin-stdlib implicitly; these are pure-Java system components, so keep it out of
-// what gets packaged (only the runtime classpaths; lint still needs its own Kotlin).
-configurations.matching { it.name.endsWith('RuntimeClasspath') }.configureEach {
-    exclude group: 'org.jetbrains.kotlin'
-    exclude group: 'org.jetbrains'
-}

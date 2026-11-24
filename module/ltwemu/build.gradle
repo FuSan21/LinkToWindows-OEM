@@ -1,40 +1,20 @@
-// LSPosed/Vector (modern libxposed API 102) module emulating the rom/patches/frameworks_base patches on
-// rooted stock Android 17. Compiles the SAME CrossDeviceService source as the framework patch.
+// LSPosed/Vector module (modern libxposed API 102): the rom/patches/frameworks_base call sites as
+// hooks, calling the same classes as the ROM build (rom/services/java). Shared settings: root
+// build.gradle.
 plugins {
     id 'com.android.application'
 }
 
-def rom = "${rootDir}/rom"
-
 android {
     namespace = 'me.ayra.ltw.emu'
-    compileSdk = 36
-
     defaultConfig {
         applicationId = 'me.ayra.ltw.emu'
-        minSdk = 32
-        targetSdk = 36
-        versionCode = (System.getenv('LTW_VERSION_CODE') ?: '1') as int
-        versionName = System.getenv('LTW_VERSION') ?: 'dev'
-    }
-    buildTypes {
-        release {
-            minifyEnabled = false
-        }
-    }
-    buildFeatures {
-        aidl = true
-        buildConfig = false
     }
     sourceSets {
         main {
-            java.srcDirs += ["${rom}/services/java"] // shared with the ROM build (not java-platform/)
-            aidl.srcDirs = ["${rom}/aidl"]
+            java.srcDirs += ["${rootDir}/rom/services/java"] // not java-platform/ (ROM only)
+            aidl.srcDirs = ["${rootDir}/rom/aidl"]
         }
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -42,12 +22,4 @@ apply from: "${rootDir}/module/signing.gradle"
 
 dependencies {
     compileOnly 'io.github.libxposed:api:102.0.0'
-    compileOnly project(':stubs')
-}
-
-// AGP 9 adds kotlin-stdlib implicitly; these are pure-Java system components, so keep it out of
-// what gets packaged (only the runtime classpaths; lint still needs its own Kotlin).
-configurations.matching { it.name.endsWith('RuntimeClasspath') }.configureEach {
-    exclude group: 'org.jetbrains.kotlin'
-    exclude group: 'org.jetbrains'
 }
