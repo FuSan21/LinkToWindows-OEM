@@ -52,7 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0   # version = git describe, versionCode = commit count
+          fetch-depth: 0   # version = git describe (tag)
 
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -68,7 +68,7 @@ jobs:
       - name: Version
         run: |
           echo "LTW_VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
-          echo "LTW_VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+          echo "LTW_VERSION_CODE=1" >> "$GITHUB_ENV"   # fixed; bump by hand for a new release
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Release keystore (optional)
