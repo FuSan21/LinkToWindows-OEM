@@ -3,6 +3,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.microsoftsdk.crossdeviceservicebroker">
 
+    <!-- OnePlus declares it in framework-res. system_server's RFCOMM side channel
+         (LtwRfcommManager) wakes Link to Windows only through receivers holding it. -->
+    <permission
+        android:name="deviceintegration.permission.BLUETOOTH_TRANSPORT_EVENT"
+        android:protectionLevel="normal" />
+
     <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.MANAGE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />

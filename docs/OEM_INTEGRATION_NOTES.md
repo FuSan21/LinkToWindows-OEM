@@ -354,6 +354,7 @@ So **frameworks/base patches are unavoidable for app streaming** (items 2, 4, 6 
 - `setSecurityToken(s)` → stored. It must match the token in the launch options (§8d).
 - `register/unregisterTaskChangeListener` → `TaskChangeNotifier`.
 - `getProximityService`, `getRfcommOemManager` → OEM objects. `isFeatureSupported(feature_proximity)=false`, so proximity can be a stub.
+  `getRfcommOemManager` is implemented (§8h).
 - `isInstantHotspotCapable` → `TetheringManager.isTetheringSupported()`.
 
 `CrossDeviceManager` static parts (client side, no binder): `isFeatureSupported` returns true for basic / remote_apps (false on fold or LightOS) / oem_rfcomm / recent_apps / instant_hotspot / audio_stream / calling / messaging, and **false for proximity**. `getAssetCategory`: 1 phone, 2 tablet, 3/4 fold. `getMaxFps`: 30 for type 1/2, else 15. `getCrossDeviceVersion`: 1. `notifyConnectionStateChange`: only OPPO telemetry, so it can be a no-op.
@@ -413,7 +414,38 @@ Body: clipboard getters + one `OnPrimaryClipChangedListener` → `ICrossDeviceCl
 2. **Milestone 4 (app streaming):** port §8d. Start with the ActivityStarter hook and scenario 0.
 3. Still open: (a) trace appmanager→deviceintegrationservice for the exact token/uuid handoff; (b) `TaskChangeNotifier`, `RfcommOemManager`, `ProximityService` bodies (in `src-services`, not yet read); (c) whether `virtual_keyboard` is required; (d) the target AOSP tree/device. The port diff depends on the exact Android version.
 
-*(Item 1 is now implemented in a different shape (§9); (b) TaskChangeNotifier was ported; (d) is decided: LineageOS 24 / lynx.)*
+*(Item 1 is now implemented in a different shape (§9); (b) TaskChangeNotifier was ported, RfcommOemManager too (§8h); (d) is decided: LineageOS 24 / lynx.)*
+
+### 8h. Bluetooth side channel (`feature_oem_rfcomm`, 2026-11-25)
+**What it is for.** Link to Windows (`RfcommOemServiceWrapper.enableRfComm(uuid, FeatureType)`) opens an
+RFCOMM server for two features: **Instant hotspot** (`HotspotUserConsentSettingViewModel`; the PC asks the
+phone over Bluetooth to start its hotspot, `SideChannelInstantHotspotRequest`) and **Bluetooth wake**
+(`ypp.wake.bluetooth.BTWakeHelper` / `BTWakeEnableRequestHandler`). It reports
+`oemBluetoothRfcommServerOpen` in its device status when `ExtGenericRfcommApi.isSideChannelSupported()`
+(`android.hardware.bluetooth` + ExtGeneric flavor + `Compatibility.isFeatureSupported("oemRfcomm")`).
+
+**Call path.** Link to Windows binds deviceintegrationservice's `ExtGenericRfCommOemService`
+(`IExtGenericRfCommOemService`, permission `ACCESS_DEVICE_INTEGRATION`), which forwards with
+`Binder.getCallingUid()` to `CrossDeviceManager.getRfcommOemManager()` → `IRfcommOemManager`
+(enable/disable(uid, uuid), get{Input,Output}ParcelFileDescriptor(uid, mac), close*). deviceintegrationservice
+itself needs `BLUETOOTH_CONNECT` (`isOemPermissionGranted`; it shows `PermissionRequestActivity`).
+
+**OnePlus** (`oplus-services` `deviceexperiences.brokerrfcomm`: `RfcommOemManager`,
+`RfcommServerRunnable`, `RfcommConnectedSession`, `RfcommPersistDataHelper`): one
+`listenUsingRfcommWithServiceRecord("RfcommOemManager", uuid)` per (uuid, uid), one app per UUID, persisted
+in `/data/system/.../saved_uuids.xml`, re-listened on `STATE_ON`, dropped on `PACKAGE_FULLY_REMOVED`. On
+accept it broadcasts `deviceintegration.rfcomm.ACTION_BT_SOCKET_CONNECTED` / `..._DISCONNECTED` (extras
+`deviceintegration:rfcomm.extra.MACADDRESS`, `...NAME`) to the app's package with receiver permission
+`deviceintegration.permission.BLUETOOTH_TRANSPORT_EVENT` (normal, framework-res); Link to Windows'
+`ypp.sidechannel.OemRfcommSideChannelBroadcastReceiver` handles it and fetches the socket as two pipes.
+
+**Ours:** `rom/services/java/.../LtwRfcommManager.java` (shared by ROM and root module), same behaviour;
+persisted in `/data/system/ltw_rfcomm_servers.txt`; callers must hold `MANAGE_CROSS_DEVICE`. Both brokers
+declare `BLUETOOTH_TRANSPORT_EVENT`. Verified on the Pixel (root module): Link to Windows registered
+UUID `111fab8f-00a2-4935-b6b4-aca388cdd473` after Instant hotspot was switched on, the server listened
+on SCN 11 and a PC-initiated RFCOMM connection was accepted and broadcast to Link to Windows. Windows
+caches a paired phone's SDP records: a phone paired before the service existed is only found after a
+fresh lookup (or re-pairing).
 
 ---
 

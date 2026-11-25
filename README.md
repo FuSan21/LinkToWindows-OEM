@@ -35,9 +35,13 @@ All of these were validated on a stock Android 17 Pixel 7a through the root modu
 | Drag & drop | PC → phone app |
 | Calls, messages, notifications, photos, recent apps | Link to Windows' own features |
 | Files in Windows File Explorer | Link to Windows' own (`All files access`); enable it in Windows → Settings → Bluetooth & devices → Mobile devices |
+| Bluetooth side channel (Instant hotspot, Bluetooth wake) | The OEM RFCOMM transport (`feature_oem_rfcomm`): system_server keeps Link to Windows' Bluetooth server open, even while the apps sleep, and wakes Link to Windows when the PC connects. Android asks once for the *Nearby devices* permission for deviceintegrationservice |
 
-Not supported: PC-side window resizing (Microsoft keeps it switched off, OnePlus too), OEM
-Bluetooth transport (`feature_oem_rfcomm`). Instant hotspot is untested.
+Not supported: PC-side window resizing (Microsoft keeps it switched off, OnePlus too).
+
+If the phone was paired with the PC over Bluetooth before you installed this, Windows may still have the
+phone's old list of Bluetooth services cached; remove the phone under Windows → Settings → Bluetooth &
+devices and pair it again.
 
 ## What you need (both paths)
 
@@ -273,6 +277,12 @@ File-by-file reference: [`rom/README.md`](rom/README.md).
 - **"Apps"** (`LtwRemoteTaskManager`): each app launched from the PC gets its own trusted virtual
   display, which deviceintegrationservice encodes to its own PC window.
 - **`vendor.virtual_keyboard`** (`rom/virtual_keyboard`): a uinput keyboard daemon for PC typing.
+- **Bluetooth side channel** (`LtwRfcommManager`, returned by `cross_device_service`): Link to Windows
+  asks, through deviceintegrationservice, for an RFCOMM server under its service UUID. system_server
+  owns the listening socket (kept across reboots and Bluetooth off/on), broadcasts
+  `deviceintegration.rfcomm.ACTION_BT_SOCKET_CONNECTED` to Link to Windows when the PC connects, and
+  hands over the connection as two pipes. The broker declares the receiver permission
+  `deviceintegration.permission.BLUETOOTH_TRANSPORT_EVENT` (framework-res on OnePlus).
 - The **root module** supplies the same pieces with files (priv-apps, permissions, sysconfig) plus
   LSPosed hooks in system_server at the same call sites the `frameworks/base` patches use, calling the
   **same classes** (`rom/services/java`).
@@ -309,8 +319,12 @@ docs/                         reverse-engineering notes
 `.github/workflows/build.yml` runs shellcheck, checks that the patches apply to the latest
 `lineage-24.0` (also weekly), and builds the module on every push. Pushing a tag `v*` publishes a GitHub
 release with `ltw_oem_module-<tag>.zip`, `update.json` (KernelSU/Magisk in-app updates) and
-`SHA256SUMS`. Microsoft APKs are never included. Add the release's changes to `CHANGELOG.md` first: the
-module manager shows it.
+`SHA256SUMS`. Microsoft APKs are never included.
+
+To release: add a section headed exactly `## vX.Y.Z` to `CHANGELOG.md`, commit, then push the tag
+`vX.Y.Z`. That section becomes the release text (the release fails without it), and KernelSU/Magisk show
+the changelog of that tag. The version name is the tag; the versionCode is the commit count, so each
+release installs as an update over the previous one.
 
 So that updates install over each other, sign with a fixed key. Add these repository secrets:
 

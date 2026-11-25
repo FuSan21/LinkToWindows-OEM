@@ -116,8 +116,8 @@ public class CrossDeviceManager {
             case FEATURE_AUDIO_STREAM:
             case FEATURE_CALLING:
             case FEATURE_MESSAGING:
+            case FEATURE_OEM_RFCOMM:  // Bluetooth side channel (LtwRfcommManager), as OnePlus
                 return true;
-            case FEATURE_OEM_RFCOMM:  // OnePlus: true (has RfcommOemManager). Not implemented yet.
             case FEATURE_PROXIMITY:   // OnePlus: false.
             default:
                 return false;

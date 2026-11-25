@@ -97,6 +97,7 @@ public final class CrossDeviceService extends ICrossDeviceService.Stub {
     private final Set<String> mBackgroundActivityAllowlist = new CopyOnWriteArraySet<>();
     private final Set<Integer> mPermissionGrantedUids = new CopyOnWriteArraySet<>();
     private final TaskChangeNotifier mTaskChangeNotifier;
+    private final LtwRfcommManager mRfcommManager;
 
     private volatile String mSecurityToken;
     private volatile RemoteTaskHost mRemoteTaskHost;
@@ -111,6 +112,7 @@ public final class CrossDeviceService extends ICrossDeviceService.Stub {
     public CrossDeviceService(Context context) {
         mContext = context;
         mTaskChangeNotifier = new TaskChangeNotifier();
+        mRfcommManager = new LtwRfcommManager(context);
         // Link to Windows "Apps" (milestone 4); hooked from ActivityTaskManagerService.
         mRemoteTaskHost = new LtwRemoteTaskManager(context, this);
     }
@@ -279,7 +281,7 @@ public final class CrossDeviceService extends ICrossDeviceService.Stub {
 
     @Override
     public IRfcommOemManager getRfcommOemManager() {
-        return null; // feature_oem_rfcomm reported unsupported (CrossDeviceManager)
+        return mRfcommManager; // feature_oem_rfcomm (Link to Windows' Bluetooth side channel)
     }
 
     @Override

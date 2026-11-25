@@ -23,6 +23,7 @@ a few system_server hooks.
 | power key dismisses the black screen (0002) | hook on `PhoneWindowManager.interceptKeyBeforeQueueing` | `ltwemu/` |
 | Apps / Remote Task (0003) | hook on `ActivityTaskManagerService.startActivityAsUser` → **same `LtwRemoteTaskManager` source** | `ltwemu/` + `rom/services/java` |
 | Apps: notifications, background-start allowlist, phone switch (0003) | hooks on `PendingIntentRecord.sendInner` and `BackgroundActivityStartController.checkBackgroundActivityStartAllowedByRealCaller` (+ `deoptimize` of its caller) | `ltwemu/` |
+| Bluetooth side channel `IRfcommOemManager` (0001) | **same `LtwRfcommManager` source**, created by `CrossDeviceService`; the broker declares `deviceintegration.permission.BLUETOOTH_TRANSPORT_EVENT` (framework-res on OnePlus) | `rom/services/java` + `broker/` |
 | `cross_device_service` sepolicy type | `sepolicy.rule`: `default_android_service` add/find (incl. `priv_app_36`) | `template/` |
 | `vendor.virtual_keyboard` init service | same binary (NDK build), started by `service.sh` as root with deviceintegrationservice's UID | `virtual_keyboard/build.sh` ← `rom/virtual_keyboard` |
 
