@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0   # version = git describe (tag)
+          fetch-depth: 0   # version = git describe, versionCode = commit count
 
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
@@ -69,7 +69,7 @@ jobs:
       - name: Version
         run: |
           echo "LTW_VERSION=$(git describe --tags --always)" >> "$GITHUB_ENV"
-          echo "LTW_VERSION_CODE=1" >> "$GITHUB_ENV"   # fixed; bump by hand for a new release
+          echo "LTW_VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"   # grows with every commit
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Release keystore (optional)
@@ -107,7 +107,7 @@ jobs:
             "version": "$LTW_VERSION",
             "versionCode": $LTW_VERSION_CODE,
             "zipUrl": "https://github.com/${{ github.repository }}/releases/download/$LTW_VERSION/ltw_oem_module-$LTW_VERSION.zip",
-            "changelog": "https://raw.githubusercontent.com/${{ github.repository }}/main/CHANGELOG.md"
+            "changelog": "https://raw.githubusercontent.com/${{ github.repository }}/$LTW_VERSION/CHANGELOG.md"
           }
           EOF
           (cd dist && sha256sum ltw_oem_module-*.zip > SHA256SUMS)
@@ -118,9 +118,21 @@ jobs:
           name: ltw-oem-${{ env.LTW_VERSION }}
           path: dist/*
 
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # The release text is the CHANGELOG.md section headed exactly "## <tag>".
+          awk -v h="## $LTW_VERSION" '$0 == h { f = 1; next } /^## / { if (f) exit } f' CHANGELOG.md             | sed -e '/./,$!d' > "$RUNNER_TEMP/release-notes.md"
+          if [ ! -s "$RUNNER_TEMP/release-notes.md" ]; then
+            echo "::error::CHANGELOG.md has no '## $LTW_VERSION' section; add it before tagging"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/release-notes.md"
+          echo "LTW_NOTES=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_ENV"
+
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: dist/*
-          generate_release_notes: true
+          body_path: ${{ env.LTW_NOTES }}

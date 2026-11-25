@@ -2,6 +2,16 @@ plugins {
     id 'com.android.application' version '9.5.2' apply false
 }
 
+// versionCode = commit count (as CI and module/build-module.sh), so every release updates over the last.
+def gitCommitCount() {
+    try {
+        return providers.exec { commandLine 'git', 'rev-list', '--count', 'HEAD' }
+                .standardOutput.asText.get().trim()
+    } catch (Exception ignored) {
+        return '1'
+    }
+}
+
 // Settings shared by the module's Android projects (:broker, :device-private, :ltwemu).
 // They are pure-Java system components that compile against hidden APIs via :stubs.
 subprojects {
@@ -11,7 +21,7 @@ subprojects {
             defaultConfig {
                 minSdk = 32
                 targetSdk = 36
-                versionCode = (System.getenv('LTW_VERSION_CODE') ?: '1') as int
+                versionCode = (System.getenv('LTW_VERSION_CODE') ?: gitCommitCount()) as int
                 versionName = System.getenv('LTW_VERSION') ?: 'dev'
             }
             buildTypes {

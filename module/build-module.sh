@@ -21,7 +21,7 @@ MOD="$ROOT/module"
 OUT="$MOD/build"
 STAGE="$OUT/stage"
 VERSION="${LTW_VERSION:-$(git -C "$ROOT" describe --tags --always 2>/dev/null || echo dev)}"
-VERSION_CODE="${LTW_VERSION_CODE:-1}"
+VERSION_CODE="${LTW_VERSION_CODE:-$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)}"
 
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 cp -r "$MOD/template/." "$STAGE/"

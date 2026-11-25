@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.0
+
+Bluetooth side channel, used by Link to Windows for **Instant hotspot** and **Bluetooth wake**.
+
+- New: the OEM Bluetooth transport (`feature_oem_rfcomm`). `cross_device_service` provides
+  `IRfcommOemManager` (`LtwRfcommManager`, ROM and root module): system_server keeps Link to Windows'
+  Bluetooth server listening while the apps sleep, across reboots and when Bluetooth is switched off and
+  on, wakes Link to Windows when the PC connects and hands it the connection.
+- The broker declares `deviceintegration.permission.BLUETOOTH_TRANSPORT_EVENT` (Link to Windows only
+  receives the wake-up with it).
+- deviceintegrationservice asks once for the *Nearby devices* (Bluetooth) permission when the feature is
+  first used.
+- Phone paired with the PC before updating: remove it in Windows → Settings → Bluetooth & devices and
+  pair again, so Windows sees the new Bluetooth service.
+- Builds: versionCode is the commit count again, so every release installs as an update; release notes
+  come from this file.
+
 ## v1.0.0
 
 First release: root module for stock Android 17 and LineageOS 24 drop-in. Phone screen, Apps, black
